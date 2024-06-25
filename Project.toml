@@ -1,0 +1,4 @@
+name = "HOI_Adaptive_Foraging"
+uuid = "456cd30b-3c0f-47be-b486-23a009a768cd"
+authors = ["Jake Harvey <jacob.harvey@mail.mcgill.ca>"]
+version = "0.1.0"
