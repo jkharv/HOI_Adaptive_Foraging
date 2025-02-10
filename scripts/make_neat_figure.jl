@@ -12,9 +12,10 @@ using Distributions
 using DataFrames
 using CSVFiles
 using SymbolicIndexingInterface
-import CairoMakie
+using FoodwebPlots
+import WGLMakie
 
-include("brose_model.jl")
+include("my_model.jl")
 
 df = DataFrame(
     :primary_extinctions => Vector{Int64}(), 
@@ -22,9 +23,13 @@ df = DataFrame(
     :g => Vector{Float64}() 
 )
 
+sol = 1
+fwm = 1
+
 for g in 0.0:0.0625:0.25
 
-    fwm = build_fwm(10, 0.3, g);
+    fwm = build_my_fwm(20, 0.3, 5, g);
+    prob = ODEProblem(fwm)
 
     # Set up vectors to record extinction data in
     primary_extinctions = Vector{Tuple{Float64,Symbol}}()
@@ -33,12 +38,12 @@ for g in 0.0:0.0625:0.25
     # Set up the callbacks
     et = HOI_Adaptive_Foraging.ExtinctionThresholdCallback2(fwm, 1e-20; 
         extinction_history = secondary_extinctions);
-    es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 200.0; 
+    es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 250.0; 
         extinction_history = primary_extinctions);
     rt = HOI_Adaptive_Foraging.RichnessTerminationCallback(fwm, 0.5);
 
     # Simulate
-    sol = solve(fwm, Rosenbrock23();
+    sol = solve(prob, Rosenbrock23();
         callback = CallbackSet(et, es, rt), 
         force_dtmin = true,
         maxiters = 1e6,
@@ -52,11 +57,4 @@ for g in 0.0:0.0625:0.25
             g = g
         )
     )    
-
-end 
-
-df.prop = df.secondary_extinctions ./ df.primary_extinctions
-save("./output/output.csv", df)
-
-p = CairoMakie.scatter(df.g, df.prop)
-save("./output/output.png", p)
+end
