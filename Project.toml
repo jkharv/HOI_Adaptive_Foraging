@@ -4,33 +4,21 @@ authors = ["Jake Harvey <jacob.harvey@mail.mcgill.ca>"]
 version = "0.1.0"
 
 [deps]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CSVFiles = "5d742f6a-9f54-50ce-8119-2520741973ca"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
-DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
-FoodwebPlots = "7dc9db8c-3692-4617-a276-47618cd48976"
-Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 HigherOrderFoodwebs = "573a6084-d739-11ed-30ee-8d814a9e0f06"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
-Observables = "510215fc-4207-5dde-b226-833fc4488ee2"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-SimpleGraphs = "55797a34-41de-5266-9ec1-32ac4eb504d3"
 SpeciesInteractionNetworks = "49e116ef-912f-4766-9e56-896a49944adc"
-SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [sources]
-FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl"}
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
 SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
 
 [compat]
-BenchmarkTools = "1.6.0"
-MacroTools = "0.5.15"
-SimpleGraphs = "0.8.6"
-WGLMakie = "0.11.1"
+OrdinaryDiffEq = "6.91.0"
+SciMLBase = "2.74.1"

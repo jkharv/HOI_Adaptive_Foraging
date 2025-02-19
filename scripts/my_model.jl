@@ -30,7 +30,7 @@ function build_my_fwm(s, c, b, g)
     traits.growth_rate       = add_param!.(Ref(fwm), :r, traits.species, 1.0);
     traits.carrying_capacity = add_param!.(Ref(fwm), :k, traits.species, 1.0);
     traits.max_consumption   = add_param!.(Ref(fwm), :y, traits.species, 4.0);
-    traits.adaptation_rate   = add_param!.(Ref(fwm), :g, traits.species, g);
+    traits.adaptation_rate   = add_param!.(Ref(fwm), :g, traits.species, copy(g));
 
     # --------------------------------------------------------- #
     # Subset the interactions for different parts of the model. #
@@ -148,6 +148,7 @@ function build_my_fwm(s, c, b, g)
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    return assemble_foodweb(fwm, Rosenbrock23());
+    return assemble_foodweb(fwm, AutoTsit5(Rosenbrock23()));
 
 end
+
