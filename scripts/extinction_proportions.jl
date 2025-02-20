@@ -14,10 +14,6 @@ using CSVFiles
 
 include("my_model.jl")
 
-simulations(
-    5, 0.3, 1, 0.0, 0.25, 10, "./output/data.csv"
-)
-
 function simulations(s, c, b, gmin, gmax, n, outpath)
  
     df = DataFrame(
@@ -73,3 +69,7 @@ function simulations(s, c, b, gmin, gmax, n, outpath)
         end
     end
 end
+
+simulations(
+    5, 0.3, 1, 0.0, 0.25, 10, "./output/data.csv"
+)
