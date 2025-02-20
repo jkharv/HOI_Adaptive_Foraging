@@ -1,3 +1,7 @@
+using Pkg
+Pkg.activate(@__DIR__)
+Pkg.instantiate()
+
 include("../src/HOI_Adaptive_Foraging.jl")
 
 using .HOI_Adaptive_Foraging
