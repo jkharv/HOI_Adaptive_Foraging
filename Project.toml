@@ -11,14 +11,14 @@ HigherOrderFoodwebs = "573a6084-d739-11ed-30ee-8d814a9e0f06"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SpeciesInteractionNetworks = "49e116ef-912f-4766-9e56-896a49944adc"
 
 [sources]
-HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
 SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
+HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
 
 [compat]
+LinearAlgebra = "1.11.0"
 OrdinaryDiffEq = "6.91.0"
 SciMLBase = "2.74.1"

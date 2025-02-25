@@ -2,3 +2,4 @@ Manifest.toml
 .vscode/settings.json
 output/*
 data.csv
+apptainer/*

@@ -3,7 +3,6 @@ module HOI_Adaptive_Foraging
 using HigherOrderFoodwebs
 using SpeciesInteractionNetworks
 using Distributions
-using Random
 using LinearAlgebra
 using DataFrames
 

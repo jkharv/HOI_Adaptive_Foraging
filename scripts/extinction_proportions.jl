@@ -1,7 +1,3 @@
-using Pkg
-Pkg.activate(@__DIR__)
-Pkg.instantiate()
-
 include("../src/HOI_Adaptive_Foraging.jl")
 
 using .HOI_Adaptive_Foraging
@@ -25,15 +21,22 @@ function simulations(s, c, b, gmin, gmax, n, outpath)
         :secondary_extinctions => Vector{Int64}(),
         :g => Vector{Float64}() 
     );
-    df_lock = ReentrantLock();
+    io_lock = ReentrantLock();
+
     snum = 1;
-    
     stepsize = (gmax - gmin) / (n-1);
-    
-    Threads.@threads for g in gmin:stepsize:gmax
+   
+    probs = []
+
+    for g ∈ gmin:stepsize:gmax
 
         fwm = build_my_fwm(s, c, b, g);
         prob = ODEProblem(fwm)
+
+        push!(probs, (fwm, prob, g))
+    end
+
+    Threads.@threads for (fwm, prob, g) ∈ probs
 
         # Set up vectors to record extinction data in
         primary_extinctions = Vector{Tuple{Float64,Symbol}}()
@@ -56,7 +59,7 @@ function simulations(s, c, b, gmin, gmax, n, outpath)
         );
 
         # Why didn't they make data frames thread safe?
-        lock(df_lock) do
+        lock(io_lock) do
 
             push!(df, 
                 (
@@ -75,5 +78,5 @@ function simulations(s, c, b, gmin, gmax, n, outpath)
 end
 
 simulations(
-    5, 0.3, 1, 0.0, 0.25, 10, "./output/data.csv"
+    30, 0.3, 5, 0.0, 0.25, 100, "./output/data.csv"
 )
