@@ -1,4 +1,4 @@
-function build_my_fwm(s, c, b, g)
+function build_my_fwm(s, c, b, gval)
 
     web, _, traits = HOI_Adaptive_Foraging.niche_model_min_basal(s, c, b)
     fwm = (FoodwebModel ∘ optimal_foraging)(web)
@@ -21,6 +21,12 @@ function build_my_fwm(s, c, b, g)
     traits.mass = f_mass.(traits.trophic_level);
 
     # ------------------------------- #
+    # Just one global adaptation_rate #
+    # ------------------------------- #
+
+    g = add_param!(fwm , :g, Vector{Symbol}(), gval)
+
+    # ------------------------------- #
     # Create species-level parameters #
     # ------------------------------- #
 
@@ -30,7 +36,6 @@ function build_my_fwm(s, c, b, g)
     traits.growth_rate       = add_param!.(Ref(fwm), :r, traits.species, 1.0);
     traits.carrying_capacity = add_param!.(Ref(fwm), :k, traits.species, 1.0);
     traits.max_consumption   = add_param!.(Ref(fwm), :y, traits.species, 4.0);
-    traits.adaptation_rate   = add_param!.(Ref(fwm), :g, traits.species, copy(g));
 
     # --------------------------------------------------------- #
     # Subset the interactions for different parts of the model. #
@@ -123,7 +128,6 @@ function build_my_fwm(s, c, b, g)
 
         x = traits[traits.species .== subject(i), :metabolic_rate][1]
         y = traits[traits.species .== subject(i), :max_consumption][1]
-        g = traits[traits.species .== subject(i), :adaptation_rate][1] 
 
         e = assimilation_efficiencies[i]
 
