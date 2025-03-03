@@ -14,88 +14,119 @@ using CSVFiles
 
 include("my_model.jl")
 
-function simulation_batch(s, c, b, gs)
+empty_df() = DataFrame(
+        :foodweb => Vector{Int64}(),
+        :nominal_richness => Vector{Int64}(),
+        :starting_richness => Vector{Int64}(),
+        :connectivity => Vector{Float64}(),
+        :g => Vector{Float64}(),  
+        :primary_extinctions => Vector{Int64}(),
+        :secondary_extinctions => Vector{Int64}()
+)
 
-    df = DataFrame(
-        :primary_extinctions => Vector{Int64}(), 
-        :secondary_extinctions => Vector{Int64}(),
-        :g => Vector{Float64}() 
-    );
+function simulation_batch(s, c, b, gmin, gmax, n, fw_num)
+
+    fwm = build_my_fwm(s, c, b, 0.0);
+    prob = ODEProblem(fwm)
+
+    stepsize = (gmax - gmin) / (n - 1)
     probs = []
+ 
+    nz_species = 0
+    for sp in species(fwm)
 
-    io_lock = ReentrantLock()
+        if fwm.u0[fwm.conversion_dict[sp]] > 0
+            nz_species += 1
+        end
+    end 
 
-    for g ∈ gs
+    # This creates a NaN if any batches have only species.
+    # Whenever n mod batch size  = 1
 
-        fwm = build_my_fwm(s, c, b, g);
-        prob = ODEProblem(fwm)
+    df = empty_df()
+    df_lock = ReentrantLock()    
+    
+    # Set simulations of the same foodweb with a bunch 
+    # of different values for adaptation rate.
+    for gval ∈ gmin:stepsize:gmax
+   
+        fwm.param_vals[fwm.conversion_dict[:g]] = gval        
 
-        push!(probs, (fwm, prob, g))
+        p = remake(prob, p = fwm.param_vals)
+        push!(probs, (p, gval))
     end
-
-    Threads.@threads for (fwm, prob, g) ∈ probs
+   
+    Threads.@threads for (p, gval) in probs
 
         # Set up vectors to record extinction data in
         primary_extinctions = Vector{Tuple{Float64,Symbol}}()
         secondary_extinctions = Vector{Tuple{Float64,Symbol}}()
 
-        # Set up the callbacks
+        # Set up callbacks
         et = ExtinctionThresholdCallback(fwm, 1e-20; 
             extinction_history = secondary_extinctions);
-        es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 250.0; 
+        es = ExtinctionSequenceCallback(fwm, shuffle(deepcopy(species(fwm))), 500.0; 
             extinction_history = primary_extinctions);
         rt = RichnessTerminationCallback(fwm, 0.5);
 
-        # Simulate
-        solve(prob, AutoTsit5(Rosenbrock23());
+        solve(p, AutoTsit5(Rosenbrock23());
             callback = CallbackSet(et, es, rt), 
             force_dtmin = true,
             save_on = false,
             maxiters = 1e6,
-            tspan = (0, 5000)
+            tspan = (0, 500 * richness(fwm) + 500)
         );
 
-        lock(io_lock)
+        lock(df_lock)
 
-        push!(df, 
+        push!(df,
             (
-            primary_extinctions = length(primary_extinctions),
-            secondary_extinctions = length(secondary_extinctions),
-            g = g
+                foodweb = fw_num,
+                nominal_richness = s,
+                starting_richness = nz_species,
+                connectivity = c,
+                g = gval,
+                primary_extinctions = length(primary_extinctions),
+                secondary_extinctions = length(secondary_extinctions)
             )
         )
 
-        unlock(io_lock)
+        unlock(df_lock)
     end
 
     return df
 end
 
 function simulations(s, c, b, gmin, gmax, n, batch_size, outpath)
- 
-    df = DataFrame(
-        :primary_extinctions => Vector{Int64}(), 
-        :secondary_extinctions => Vector{Int64}(),
-        :g => Vector{Float64}() 
-    );
 
-    stepsize = (gmax - gmin) / (n-1);
-    steps = gmin:stepsize:gmax
-   
-    batches  = Iterators.partition(steps, batch_size)
+    # Create the output file. Replacing whatever was there before.
+    CSV.write(outpath, empty_df(); header = true, append = false)
 
-    for batch ∈ batches
+    n_batches  = div(n, batch_size)
+    remainder = mod(n, batch_size) 
 
-        df_batch = simulation_batch(s, c, b, batch)
+    itr = [[batch_size for i in 1:n_batches]..., remainder]
+
+    df = empty_df()
+
+    for (i, n) in enumerate(itr)
+
+        df_batch = simulation_batch(s, c, b, gmin, gmax, n, i)
+
         append!(df, df_batch)
-
-
-        println(df_batch)
+        CSV.write(outpath, df_batch; append = true)
     end
 
     return df
 end
 
-simulations(
-    5, 0.3, 1, 0.0, 0.25, 100, 5, "./output/data.csv"
+df = simulations(
+    30,      # Richness
+    0.3,     # Connectivity
+    5,       # Minimum number of basal species
+    0.0,     # Minimum adaptive rate 
+    0.25,    # Maximum adaptive rate 
+    200,     # Number of simulations
+    10,      # Number of batches / foodwebs
+    "output/data.csv" # Output file path
 )
