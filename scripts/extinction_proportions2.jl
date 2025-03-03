@@ -14,6 +14,16 @@ using CSVFiles
 
 include("my_model.jl")
 
+empty_df() = DataFrame(
+        :foodweb => Vector{Int64}(),
+        :nominal_richness => Vector{Int64}(),
+        :starting_richness => Vector{Int64}(),
+        :connectivity => Vector{Float64}(),
+        :g => Vector{Float64}(),  
+        :primary_extinctions => Vector{Int64}(),
+        :secondary_extinctions => Vector{Int64}()
+)
+
 function simulation_batch(s, c, b, gmin, gmax, n, fw_num)
 
     fwm = build_my_fwm(s, c, b, 0.0);
@@ -27,22 +37,13 @@ function simulation_batch(s, c, b, gmin, gmax, n, fw_num)
 
         if fwm.u0[fwm.conversion_dict[sp]] > 0
             nz_species += 1
-            println(fwm.u0[fwm.conversion_dict[sp]])
         end
     end 
 
     # This creates a NaN if any batches have only species.
     # Whenever n mod batch size  = 1
 
-    df = DataFrame(
-        :foodweb => Vector{Int64}(),
-        :nominal_richness => Vector{Int64}(),
-        :starting_richness => Vector{Int64}(),
-        :connectivity => Vector{Float64}(),
-        :g => Vector{Float64}(),  
-        :primary_extinctions => Vector{Int64}(),
-        :secondary_extinctions => Vector{Int64}()
-    )
+    df = empty_df()
     df_lock = ReentrantLock()    
     
     # Set simulations of the same foodweb with a bunch 
@@ -96,25 +97,36 @@ function simulation_batch(s, c, b, gmin, gmax, n, fw_num)
     return df
 end
 
+function simulations(s, c, b, gmin, gmax, n, batch_size, outpath)
 
-function simulations(s, c, b, gmin, gmax, n, batch_size)
-
+    # Create the output file. Replacing whatever was there before.
+    CSV.write(outpath, empty_df(); header = true, append = false)
 
     n_batches  = div(n, batch_size)
     remainder = mod(n, batch_size) 
 
     itr = [[batch_size for i in 1:n_batches]..., remainder]
 
-    df = DataFrame()
+    df = empty_df()
 
     for (i, n) in enumerate(itr)
 
         df_batch = simulation_batch(s, c, b, gmin, gmax, n, i)
 
         append!(df, df_batch)
+        CSV.write(outpath, df_batch; append = true)
     end
 
     return df
 end
 
-simulations(15, 0.3, 4, 0.0, 0.25, 10, 3)
+df = simulations(
+    30,      # Richness
+    0.3,     # Connectivity
+    5,       # Minimum number of basal species
+    0.0,     # Minimum adaptive rate 
+    0.25,    # Maximum adaptive rate 
+    200,     # Number of simulations
+    10,      # Number of batches / foodwebs
+    "output/data.csv" # Output file path
+)
