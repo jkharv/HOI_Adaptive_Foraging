@@ -14,21 +14,18 @@ using CSVFiles
 
 include("my_model.jl")
 
-function simulations(s, c, b, gmin, gmax, n, outpath)
- 
+function simulation_batch(s, c, b, gs)
+
     df = DataFrame(
         :primary_extinctions => Vector{Int64}(), 
         :secondary_extinctions => Vector{Int64}(),
         :g => Vector{Float64}() 
     );
-    io_lock = ReentrantLock();
-
-    snum = 1;
-    stepsize = (gmax - gmin) / (n-1);
-   
     probs = []
 
-    for g ∈ gmin:stepsize:gmax
+    io_lock = ReentrantLock()
+
+    for g ∈ gs
 
         fwm = build_my_fwm(s, c, b, g);
         prob = ODEProblem(fwm)
@@ -58,25 +55,47 @@ function simulations(s, c, b, gmin, gmax, n, outpath)
             tspan = (0, 5000)
         );
 
-        # Why didn't they make data frames thread safe?
-        lock(io_lock) do
+        lock(io_lock)
 
-            push!(df, 
-                (
-                    primary_extinctions = length(primary_extinctions),
-                    secondary_extinctions = length(secondary_extinctions),
-                    g = g
-                )
-            )    
+        push!(df, 
+            (
+            primary_extinctions = length(primary_extinctions),
+            secondary_extinctions = length(secondary_extinctions),
+            g = g
+            )
+        )
 
-            println("Finished simulation number $snum for g = $g")
-            snum += 1
-
-            save(outpath, df)
-        end
+        unlock(io_lock)
     end
+
+    return df
+end
+
+function simulations(s, c, b, gmin, gmax, n, batch_size, outpath)
+ 
+    df = DataFrame(
+        :primary_extinctions => Vector{Int64}(), 
+        :secondary_extinctions => Vector{Int64}(),
+        :g => Vector{Float64}() 
+    );
+
+    stepsize = (gmax - gmin) / (n-1);
+    steps = gmin:stepsize:gmax
+   
+    batches  = Iterators.partition(steps, batch_size)
+
+    for batch ∈ batches
+
+        df_batch = simulation_batch(s, c, b, batch)
+        append!(df, df_batch)
+
+
+        println(df_batch)
+    end
+
+    return df
 end
 
 simulations(
-    30, 0.3, 5, 0.0, 0.25, 100, "./output/data.csv"
+    5, 0.3, 1, 0.0, 0.25, 100, 5, "./output/data.csv"
 )
