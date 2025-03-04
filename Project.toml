@@ -15,8 +15,8 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SpeciesInteractionNetworks = "49e116ef-912f-4766-9e56-896a49944adc"
 
 [sources]
-HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
 SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
+HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
 
 [compat]
 CSV = "0.10.15"

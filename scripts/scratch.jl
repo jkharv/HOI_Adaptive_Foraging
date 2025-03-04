@@ -2,7 +2,6 @@ include("../src/HOI_Adaptive_Foraging.jl")
 
 using .HOI_Adaptive_Foraging
 using OrdinaryDiffEq
-using SciMLBase
 using HigherOrderFoodwebs
 using SpeciesInteractionNetworks
 using ModelingToolkit
@@ -11,8 +10,14 @@ using LinearAlgebra
 using Statistics
 using Distributions
 using DataFrames
+using CSV
 
-web, _, traits = HOI_Adaptive_Foraging.niche_model_min_basal(20, 0.15, 5)
+s = 5
+c = 0.3
+b = 1
+gval = 0.0
+
+web, _, traits = HOI_Adaptive_Foraging.niche_model_min_basal(s, c, b)
 fwm = (FoodwebModel ∘ optimal_foraging)(web)
 
 # ---------------------------------------------------------------- #
@@ -33,6 +38,12 @@ f_mass(tl) = mass_ratio^tl;
 traits.mass = f_mass.(traits.trophic_level);
 
 # ------------------------------- #
+# Just one global adaptation_rate #
+# ------------------------------- #
+
+g = add_param!(fwm , :g, Vector{Symbol}(), gval)
+
+# ------------------------------- #
 # Create species-level parameters #
 # ------------------------------- #
 
@@ -42,7 +53,6 @@ traits.metabolic_rate    = add_param!.(Ref(fwm), :x, traits.species,
 traits.growth_rate       = add_param!.(Ref(fwm), :r, traits.species, 1.0);
 traits.carrying_capacity = add_param!.(Ref(fwm), :k, traits.species, 1.0);
 traits.max_consumption   = add_param!.(Ref(fwm), :y, traits.species, 4.0);
-traits.adaptation_rate   = add_param!.(Ref(fwm), :g, traits.species, 0.01);
 
 # --------------------------------------------------------- #
 # Subset the interactions for different parts of the model. #
@@ -135,7 +145,6 @@ for i ∈ trophic
 
     x = traits[traits.species .== subject(i), :metabolic_rate][1]
     y = traits[traits.species .== subject(i), :max_consumption][1]
-    g = traits[traits.species .== subject(i), :adaptation_rate][1] 
 
     e = assimilation_efficiencies[i]
 
@@ -160,34 +169,29 @@ for i ∈ trophic
     fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
 end
 
+u0 = Dict(fwm.vars .=> rand(richness(fwm)))
+set_u0!(fwm, u0)
+
+prob = ODEProblem(fwm)
 
 
-ODEProblem{true, SciMLBase.FullSpecialize}(fwm)
+
+init(prob, Rosenbrock23(); tspan = (1,10))
 
 
-@btime assemble_foodweb(fwm, Rosenbrock23()); # 56s
-@btime assemble_foodweb(fwm, RK4()); # 58s
-@btime assemble_foodweb(fwm, QNDF()); # 54s
-@btime assemble_foodweb(fwm, AutoTsit5(Rosenbrock23())); # 50s
-@btime assemble_foodweb(fwm, Rodas4()); # # 54
-
-@btime prob = ODEProblem(fwm) # 55s
-
-# Set up vectors to record extinction data in
-primary_extinctions = Vector{Tuple{Float64,Symbol}}()
-secondary_extinctions = Vector{Tuple{Float64,Symbol}}()
-
-# Set up the callbacks
-et = ExtinctionThresholdCallback(fwm, 1e-20; 
-    extinction_history = secondary_extinctions);
-es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 250.0; 
-    extinction_history = primary_extinctions);
-rt = RichnessTerminationCallback(fwm, 0.5);
-
-# Simulate
-@btime sol = solve(prob, AutoTsit5(Rosenbrock23());
-    callback = CallbackSet(et, es, rt), 
-    force_dtmin = true,
-    maxiters = 1e6,
-    tspan = (0, 5000)
+sol = solve(prob, AutoTsit5(Rosenbrock23());
+    callback = ExtinctionThresholdCallback(fwm, 10e-20),
+    reltol = 0.001,
+    abstol = 0.001,
+    tspan = (1, 10000)
 );
+
+n_surviving = 0
+for sp in species(fwm)
+
+    if sol[sp, end] > 0
+
+        n_surviving += 1
+    end
+end
+println(n_surviving)

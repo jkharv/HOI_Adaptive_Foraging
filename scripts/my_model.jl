@@ -152,10 +152,6 @@ function build_my_fwm(s, c, b, gval)
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    return assemble_foodweb(fwm, AutoTsit5(Rosenbrock23());
-        reltol = 0.1,
-        abstol = 0.1 
-    );
-
+    return assemble_foodweb(fwm)
 end
 

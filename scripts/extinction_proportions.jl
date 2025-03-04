@@ -121,12 +121,15 @@ function simulations(s, c, b, gmin, gmax, n, batch_size, outpath)
 end
 
 df = simulations(
-    30,      # Richness
-    0.3,     # Connectivity
-    5,       # Minimum number of basal species
-    0.0,     # Minimum adaptive rate 
-    0.25,    # Maximum adaptive rate 
-    200,     # Number of simulations
-    10,      # Number of batches / foodwebs
+    15,   # Richness
+    0.3,  # Connectivity
+    3,    # Minimum number of basal species
+    0.0,  # Minimum adaptive rate 
+    0.25, # Maximum adaptive rate 
+    200,  # Number of simulations
+    10,   # Number of batches / foodwebs
     "output/data.csv" # Output file path
 )
+
+# If there's less than 2 simulations per batch, it causes
+# problems. There's also problems if there's less than 2 batches.
