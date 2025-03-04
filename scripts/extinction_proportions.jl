@@ -10,7 +10,7 @@ using LinearAlgebra
 using Statistics
 using Distributions
 using DataFrames
-using CSVFiles
+using CSV
 
 include("my_model.jl")
 
