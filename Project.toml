@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 HigherOrderFoodwebs = "573a6084-d739-11ed-30ee-8d814a9e0f06"
@@ -15,11 +16,12 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SpeciesInteractionNetworks = "49e116ef-912f-4766-9e56-896a49944adc"
 
 [sources]
-SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
+SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
 
 [compat]
 CSV = "0.10.15"
+CairoMakie = "0.13.2"
 LinearAlgebra = "1.11.0"
 OrdinaryDiffEq = "6.91.0"
 SciMLBase = "2.74.1"

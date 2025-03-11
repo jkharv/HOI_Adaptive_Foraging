@@ -1,3 +1,22 @@
+"""
+This function is still kinda shit cause it's asymptotes at the MAX value way past
+x = 1.0 I need to get something that behaves a little better. I could just jack n 
+way up but then the function isn't smooth enough around the middle.
+"""
+function scaled_assimilation_efficiency(niche_radius, niche_centre, trait_value)
+
+    MAX = 0.8
+    MIN = 0.1
+    k   = 0.5
+    n   = 4
+
+    @assert abs(trait_value - niche_centre) <= niche_radius
+
+    x = (niche_radius - abs(trait_value - niche_centre)) / niche_radius
+
+    return (MAX - MIN) * (x^n / (k^n + x^n)) + MIN
+end
+
 function build_my_fwm(s, c, b, gval)
 
     web, _, traits = HOI_Adaptive_Foraging.niche_model_min_basal(s, c, b)
@@ -12,8 +31,9 @@ function build_my_fwm(s, c, b, gval)
     traits.trophic_level = distancetobase.(Ref(fwm.hg), traits.species, mean);
 
     # Niche stuff
-    traits.niche_centre = traits.niche_upper .- traits.niche_lower;
-    traits.niche_range = traits.niche_centre ./ 2;
+    traits.niche_diameter = traits.niche_upper .- traits.niche_lower;
+    traits.niche_radius = traits.niche_diameter ./ 2
+    traits.niche_centre = traits.niche_lower .+ traits.niche_radius
 
     # Body Mass
     mass_ratio = 1000;
@@ -52,8 +72,6 @@ function build_my_fwm(s, c, b, gval)
 
     assimilation_efficiencies = Dict{Interaction, Num}();
 
-    F(B_focal, B_resources, a_resources, b0) = (B_focal * a_resources[1]) / (b0 + a_resources ⋅ B_resources);
-
     for intx ∈ trophic
 
         sym = Symbol("$(subject(intx))_$(object(intx))")
@@ -62,11 +80,14 @@ function build_my_fwm(s, c, b, gval)
         o = object(intx)
 
         s_niche_centre = traits[traits.species .== s, :niche_centre][1]
-        s_niche_range  = traits[traits.species .== s, :niche_range][1]
+        s_niche_radius  = traits[traits.species .== s, :niche_radius][1]
         o_trait_value  = traits[traits.species .== o, :trait_value][1]
 
-        e_value = pdf(Normal(0, 0.5), (o_trait_value - s_niche_centre)/ s_niche_range) + 1e-10
-        e_value = 0.45
+        e_value = scaled_assimilation_efficiency(
+            s_niche_radius, 
+            s_niche_centre, 
+            o_trait_value
+        )
 
         p = add_param!(fwm, :e, sym, e_value)
 
@@ -85,7 +106,7 @@ function build_my_fwm(s, c, b, gval)
         o = object(i)
 
         sym = Symbol("a_$(s)_$(o)")
-        var = add_var!(fwm, sym, fwm.t)
+        var = add_var!(fwm, sym, TRAIT_VARIABLE)
 
         attack_rates[(s, o)] = var 
     end
@@ -97,7 +118,7 @@ function build_my_fwm(s, c, b, gval)
     for i ∈ producer_growth
 
         sbj = subject(i)
-        s = fwm.conversion_dict[sbj]
+        s = sym_to_var(fwm, sbj)
 
         r = traits[traits.species .== sbj, :growth_rate][1]
         k = traits[traits.species .== sbj, :carrying_capacity][1]
@@ -110,7 +131,7 @@ function build_my_fwm(s, c, b, gval)
     for i ∈ consumer_growth
 
         sbj = subject(i)
-        s = fwm.conversion_dict[sbj]
+        s = sym_to_var(fwm, sbj)
 
         x = traits[traits.species .== sbj, :metabolic_rate][1]
 
@@ -119,11 +140,13 @@ function build_my_fwm(s, c, b, gval)
         )
     end
 
+    F(B_focal, B_resources, a_resources, b0) = (B_focal * a_resources[1]) / (b0 + a_resources ⋅ B_resources);
+
     for i ∈ trophic
 
-        s = fwm.conversion_dict[subject(i)]
-        o = fwm.conversion_dict[object(i)]
-        m = [fwm.conversion_dict[x] for x in with_role(:AF_modifier, i)]
+        s = sym_to_var(fwm, subject(i))
+        o = sym_to_var(fwm, object(i))
+        m = [sym_to_var(fwm, x) for x in with_role(:AF_modifier, i)]
         r = [o, m...]
 
         x = traits[traits.species .== subject(i), :metabolic_rate][1]
@@ -141,7 +164,7 @@ function build_my_fwm(s, c, b, gval)
         mean_gain = mean(x * y * F.(r, Ref(r), Ref(ar_norm), Ref(0.5)))
 
         fwm.aux_dynamic_rules[a] = DynamicRule( 
-            g * ar_norm[1] * (1 - ar_norm[1]) * (object_gain - mean_gain)
+            g * ar_norm[1] * (object_gain - mean_gain)
         )
 
         fwm.u0[a] = 1/length(r)
@@ -152,6 +175,6 @@ function build_my_fwm(s, c, b, gval)
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    return assemble_foodweb(fwm)
+    return assemble_foodweb(fwm; extra_transient_time = 2000)
 end
 
