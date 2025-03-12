@@ -69,10 +69,10 @@ function simulation_batch(s, c, b, gmin, gmax, n, fw_num)
             tspan = (0, 2000)
         );
 
+        lock(df_lock)
+        
         intxs = trophic_flux(fwm, sol, 2000; include_loops = false)
         rc_val = count(!iszero, values(intxs)) / 10^2
-
-        lock(df_lock)
 
         push!(df,
             (
