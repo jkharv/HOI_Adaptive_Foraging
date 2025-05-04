@@ -6,7 +6,7 @@ way up but then the function isn't smooth enough around the middle.
 function scaled_assimilation_efficiency(niche_radius, niche_centre, trait_value)
 
     MAX = 0.8
-    MIN = 0.1
+    MIN = 0.05
     k   = 0.5
     n   = 4
 
@@ -118,7 +118,7 @@ function build_my_fwm(s, c, b, gval)
     for i ∈ producer_growth
 
         sbj = subject(i)
-        s = sym_to_var(fwm, sbj)
+        s = get_variable(fwm, sbj)
 
         r = traits[traits.species .== sbj, :growth_rate][1]
         k = traits[traits.species .== sbj, :carrying_capacity][1]
@@ -131,7 +131,7 @@ function build_my_fwm(s, c, b, gval)
     for i ∈ consumer_growth
 
         sbj = subject(i)
-        s = sym_to_var(fwm, sbj)
+        s = get_variable(fwm, sbj)
 
         x = traits[traits.species .== sbj, :metabolic_rate][1]
 
@@ -144,9 +144,10 @@ function build_my_fwm(s, c, b, gval)
 
     for i ∈ trophic
 
-        s = sym_to_var(fwm, subject(i))
-        o = sym_to_var(fwm, object(i))
-        m = [sym_to_var(fwm, x) for x in with_role(:AF_modifier, i)]
+        
+        s = get_variable(fwm, subject(i))
+        o = get_variable(fwm, object(i))
+        m = [get_variable(fwm, x) for x in with_role(:AF_modifier, i)]
         r = [o, m...]
 
         x = traits[traits.species .== subject(i), :metabolic_rate][1]
@@ -164,17 +165,16 @@ function build_my_fwm(s, c, b, gval)
         mean_gain = mean(x * y * F.(r, Ref(r), Ref(ar_norm), Ref(0.5)))
 
         fwm.aux_dynamic_rules[a] = DynamicRule( 
-            g * ar_norm[1] * (object_gain - mean_gain)
+            g * a * (1 - a) * (object_gain - mean_gain)
         )
 
-        fwm.u0[a] = 1/length(r)
+        set_u0!(fwm, Dict(a => 1/length(r)))
 
         fwd = x * y * s * F(o, r, ar_norm, 0.5) * e
-        bwd = -fwd / e 
+        bwd = -1.0 * fwd / e 
 
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    return assemble_foodweb(fwm; extra_transient_time = 2000)
+    return (traits, fwm, assemble_foodweb(fwm; extra_transient_time = 2000))
 end
-
