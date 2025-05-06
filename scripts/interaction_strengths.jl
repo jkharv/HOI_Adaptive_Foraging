@@ -22,10 +22,10 @@ include("my_model.jl")
 
 function sims()
 
-    s = 10 
+    s = 5
     n_extinctions = s/2
     ntrajectories = 15
-    traits, fwm, prob = build_my_fwm(s, 0.3, 2, 0.0);
+    traits, fwm, prob = build_my_fwm(s, 0.3, 2, 0.5);
     primary_extinctions = Vector{Tuple{Float64, Symbol}}()
 
     es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 5000.0);
@@ -43,14 +43,15 @@ function sims()
 
     function out_func(sol, i)
 
-        ret = (sol, i/ntrajectories * 0.5555555555)
+        prefs = [interaction_strength(sol, t) for t in sol.t]
+
+        ret = (sol.t, prefs, i/ntrajectories * 0.5555555555)
         return (ret, false)
     end
 
     eprob = EnsembleProblem(prob;
         prob_func = prob_func,
         output_func = out_func,
-        safetycopy = true
     )
 
     @time sols = solve(eprob, 
@@ -65,8 +66,19 @@ function sims()
     return (fwm, sols)
 end
 
-function normed_alphas(fwm, sol, t)
+# @time sol = solve(prob, 
+#         AutoTsit5(Rosenbrock23()), 
+#         callback = cb,
+#         force_dtmin = true,
+#         maxiters = 1e7,
+#         trajectories = ntrajectories, 
+#         tspan = (1, n_extinctions * 5500.0)
+# );
 
+
+function interaction_strength(sol, t)
+
+    fwm = sol.prob.f.sys
     a_norms = Vector{Float64}()
 
     for intx in interactions(fwm)
@@ -89,34 +101,29 @@ function normed_alphas(fwm, sol, t)
         push!(a_norms, norm)
     end
 
-    return a_norms
+    return median(a_norms)
 end
+
+function time_covariance(sol, t)
+
+    fwm = sol.prob.f.sys
+    spp = variables(fwm, type = SPECIES_VARIABLE)
+
+
+
+end
+
+
+sol(1:sol.t[end], idxs = spp[1])
+
 
 fwm, sols = sims();
 
 f = WGLMakie.Figure()
 ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "median foraging preference")
+empty!(ax)
 
-for (sol, g) in sols 
-
-    abars = []
-    ts = []
-    for t in 0:100:5000 
-
-        abar = median(normed_alphas(fwm, sol, t))
-
-        push!(abars, abar)
-        push!(ts, t)
-    end
-
-    WGLMakie.lines!(ax, ts, abars)
-end
-
-f = WGLMakie.Figure()
-ax = WGLMakie.Axis(f[1,1], xlabel = "Timestep", ylabel = "Biomass")
-
-sol = first(sols[5]);
-for sp in species(fwm)
-        
-        WGLMakie.lines!(ax, sol.t, sol[sp])
+for (t, prefs, g) in sols 
+    
+    WGLMakie.lines!(ax, t, prefs)
 end
