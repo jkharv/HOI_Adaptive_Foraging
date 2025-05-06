@@ -176,5 +176,5 @@ function build_my_fwm(s, c, b, gval)
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    return (traits, fwm, assemble_foodweb(fwm; extra_transient_time = 2000))
+    return (traits, fwm, assemble_foodweb(fwm; extra_transient_time = 10_000))
 end
