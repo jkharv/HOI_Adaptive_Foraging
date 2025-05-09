@@ -9,8 +9,10 @@ using DataFrames
 include("../src/modified_niche_model.jl")
 export modified_niche_model
 
-# include("../src/pairwise_network_sample.jl")
-# export pairwise_network_sample
+include("../src/measures.jl")
+export median_interaction_strength, time_window_population_cv
+export jacobian_interaction_strength, time_window_community_cv
+
 
 # Count the number of basal species in the foodweb.
 function count_basal(web::SpeciesInteractionNetwork)
