@@ -24,11 +24,11 @@ function sims()
 
     s = 5
     n_extinctions = s/2
-    ntrajectories = 15
+    ntrajectories = 5
     traits, fwm, prob = build_my_fwm(s, 0.3, 2, 0.5);
     primary_extinctions = Vector{Tuple{Float64, Symbol}}()
 
-    es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 5000.0);
+    # es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 5000.0);
     rt = RichnessTerminationCallback(fwm, 0.5);
     et = ExtinctionThresholdCallback(fwm, 10e-20);
     cb = CallbackSet(et, rt, es);
@@ -43,15 +43,23 @@ function sims()
 
     function out_func(sol, i)
 
-        prefs = [interaction_strength(sol, t) for t in sol.t]
+        prefs = [median_interaction_strength(sol, t) for t in sol.t]
+        pop_cvs = time_window_population_cv(sol, 10.0)
+        com_cvs = time_window_community_cv(sol, 10.0)
 
-        ret = (sol.t, prefs, i/ntrajectories * 0.5555555555)
+        ret = (
+            t = sol.t, 
+            median_alpha = prefs, 
+            pop_cv_avg = pop_cvs, 
+            com_cv = com_cvs,
+            g = i/ntrajectories * 0.5555555555
+        )
         return (ret, false)
     end
 
     eprob = EnsembleProblem(prob;
         prob_func = prob_func,
-        output_func = out_func,
+        output_func = out_func
     )
 
     @time sols = solve(eprob, 
@@ -75,55 +83,13 @@ end
 #         tspan = (1, n_extinctions * 5500.0)
 # );
 
-
-function interaction_strength(sol, t)
-
-    fwm = sol.prob.f.sys
-    a_norms = Vector{Float64}()
-
-    for intx in interactions(fwm)
-
-        r = fwm.dynamic_rules[intx]
-        vs = r.vars
-        as = filter(x -> variable_type(fwm.vars, x) == TRAIT_VARIABLE, vs)
-    
-        if isempty(as)
-
-            continue
-        end
-
-        focal = as[1]
-
-        focal_val = sol(t, idxs = focal)
-        total_val = sum([sol(t, idxs = x) for x in as])
-
-        norm = focal_val / total_val
-        push!(a_norms, norm)
-    end
-
-    return median(a_norms)
-end
-
-function time_covariance(sol, t)
-
-    fwm = sol.prob.f.sys
-    spp = variables(fwm, type = SPECIES_VARIABLE)
-
-
-
-end
-
-
-sol(1:sol.t[end], idxs = spp[1])
-
-
 fwm, sols = sims();
 
 f = WGLMakie.Figure()
 ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "median foraging preference")
 empty!(ax)
 
-for (t, prefs, g) in sols 
+for sol in sols 
     
-    WGLMakie.lines!(ax, t, prefs)
+    WGLMakie.lines!(ax, sol.t, sol.com_cv)
 end

@@ -5,14 +5,19 @@ using SpeciesInteractionNetworks
 using Distributions
 using LinearAlgebra
 using DataFrames
+using DiffEqCallbacks
+using SparseArrays
+using SciMLBase
 
 include("../src/modified_niche_model.jl")
 export modified_niche_model
 
 include("../src/measures.jl")
 export median_interaction_strength, time_window_population_cv
-export jacobian_interaction_strength, time_window_community_cv
+export eigenstability, time_window_community_cv, richness
 
+include("../src/alpha_manifold.jl")
+export AlphaManifold
 
 # Count the number of basal species in the foodweb.
 function count_basal(web::SpeciesInteractionNetwork)

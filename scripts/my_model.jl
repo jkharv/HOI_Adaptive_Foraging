@@ -165,7 +165,7 @@ function build_my_fwm(s, c, b, gval)
         mean_gain = mean(x * y * F.(r, Ref(r), Ref(ar_norm), Ref(0.5)))
 
         fwm.aux_dynamic_rules[a] = DynamicRule( 
-            g * a * (1 - a) * (object_gain - mean_gain)
+            g * a * (1.0 - a)^100 * (object_gain - mean_gain)
         )
 
         set_u0!(fwm, Dict(a => 1/length(r)))
