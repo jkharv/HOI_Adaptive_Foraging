@@ -17,7 +17,7 @@ export median_interaction_strength, time_window_population_cv
 export eigenstability, time_window_community_cv, richness
 
 include("../src/alpha_manifold.jl")
-export AlphaManifold
+export AlphaManifoldCallback
 
 # Count the number of basal species in the foodweb.
 function count_basal(web::SpeciesInteractionNetwork)

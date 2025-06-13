@@ -6,7 +6,7 @@ way up but then the function isn't smooth enough around the middle.
 function scaled_assimilation_efficiency(niche_radius, niche_centre, trait_value)
 
     MAX = 0.8
-    MIN = 0.05
+    MIN = 0.2
     k   = 0.5
     n   = 4
 
@@ -140,7 +140,8 @@ function build_my_fwm(s, c, b, gval)
         )
     end
 
-    F(B_focal, B_resources, a_resources, b0) = (B_focal * a_resources[1]) / (b0 + a_resources ⋅ B_resources);
+    F(B_focal, B_resources, a_resources, b0) = 
+        (B_focal * a_resources[1]) / (b0 + a_resources ⋅ B_resources);
 
     for i ∈ trophic
 
@@ -158,14 +159,13 @@ function build_my_fwm(s, c, b, gval)
         a = attack_rates[(subject(i), object(i))]
         ar = [attack_rates[(subject(i), x)] for x in with_role(:AF_modifier, i)]
         ar = [a, ar...] 
-
         ar_norm = ar ./ sum(ar)
 
         object_gain = x * y * F(o, r, ar_norm, 0.5)
         mean_gain = mean(x * y * F.(r, Ref(r), Ref(ar_norm), Ref(0.5)))
 
         fwm.aux_dynamic_rules[a] = DynamicRule( 
-            g * a * (1.0 - a)^100 * (object_gain - mean_gain)
+            g * a * (object_gain - mean_gain)
         )
 
         set_u0!(fwm, Dict(a => 1/length(r)))
@@ -176,5 +176,5 @@ function build_my_fwm(s, c, b, gval)
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    return (traits, fwm, assemble_foodweb(fwm; extra_transient_time = 10_000))
+    return (traits, fwm, assemble_foodweb(fwm; extra_transient_time = 1_000))
 end
