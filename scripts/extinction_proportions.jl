@@ -4,6 +4,8 @@ using .HOI_Adaptive_Foraging
 
 using OrdinaryDiffEqTsit5
 using OrdinaryDiffEqRosenbrock
+using DiffEqNoiseProcess
+using StochasticDiffEq
 
 using SpeciesInteractionNetworks
 using HigherOrderFoodwebs
@@ -20,6 +22,7 @@ using CSV
 import WGLMakie
 using FoodwebPlots
 include("my_model.jl")
+include("my_stochastic_model.jl")
 
 """
     extra_save_points(times)
@@ -73,20 +76,24 @@ function sims(
         es = ExtinctionSequenceCallback(fwm, deepcopy(extinction_order), extinction_times;
             extinction_history = primary_extinctions[i]
         );
-        et = ExtinctionThresholdCallback(fwm, 1e-10;
+        et = ExtinctionThresholdCallback(fwm, 1e-15;
             extinction_history = secondary_extinctions[i] 
         );
-        cb = CallbackSet(et, es);
+        am = AlphaManifoldCallback(fwm);
+        cb = CallbackSet(et, es, am);
+
+        noise = WienerProcess(0.0, zeros(Float64, size(prob.u0)), zeros(Float64, size(prob.u0)))
 
         return remake(prob, 
             callback = cb,
-            p = Dict(:g => gs[i]) 
+            p = Dict(:g => gs[i]),
+            noise = noise
         )
     end
 
     function out_func(sol, i)
 
-        prefs = [median_interaction_strength(sol, t) for t in sol.t]
+        prefs = median_interaction_strength(sol)
         pop_cvs = time_window_population_cv(sol, 10.0;
             window_alignment = :LEFT
         )
@@ -115,7 +122,7 @@ function sims(
     )
 
     @time sols = solve(eprob, 
-        AutoTsit5(Rosenbrock23()), 
+        SOSRA(), 
         EnsembleThreads(); 
         force_dtmin = true,
         maxiters = 1e7,
@@ -170,6 +177,7 @@ function cutup!(df, sols, foodweb_id = missing, sequence_id = missing)
                 g = sol.g,
                 extinction_species = sp,
                 richness_pre = sol.richness[i1-1],
+                richness_post = sol.richness[i2-1],
                 secondary_extinctions = secondary_extinctions_over_period(sol, i1, i2),
                 t1 = sol.t[i1],
                 t2 = sol.t[i2],
@@ -198,79 +206,98 @@ function secondary_extinctions_over_period(sol, id1, id2)
     return secondary_extinctions
 end
 
-stuff = DataFrame()
+function do_stuff()
 
-for fwm_num in 1:1
+    stuff = DataFrame()
 
-    traits, fwm, prob = build_my_fwm(30, 0.3, 5, 0.0);
+    for fwm_num in 1:1
 
-    for seq_num in 1:10
+        traits, fwm, prob = build_my_stochastic_fwm(10, 0.3, 2, 0.0);
 
-        seq = (shuffle ∘ species)(fwm)
-        times = collect((1_000.0:1_000.0:(length(seq) * 1_000.0)))
+        for seq_num in 1:3
 
-        sols = sims(traits, fwm, prob;
-            extinction_times = times,
-            extinction_order = seq
-        );
+            seq = (shuffle ∘ species)(fwm)
+            times = collect((1_000.0:1_000.0:(length(seq) * 1_000.0)))
 
-        cutup!(stuff, sols, fwm_num, seq_num)
-    end
-end
+            sols = sims(traits, fwm, prob;
+                extinction_times = times,
+                extinction_order = seq
+            );
 
-CSV.write("data.csv", stuff)
-
-if false
-
-    traits, fwm, prob = build_my_fwm(30, 0.3, 5, 0.0);
-
-    times = collect((1_000.0:1_000.0:(richness(fwm) * 1_000.0)))
-    es = ExtinctionSequenceCallback(fwm, (shuffle ∘ species)(fwm), times);
-    et = ExtinctionThresholdCallback(fwm, 1e-15);
-    am = AlphaManifoldCallback(fwm);
-
-    prob = remake(prob, 
-        p = Dict(:g => 0.10)
-    )
-
-    sol = @time sols = solve(prob, 
-        AutoTsit5(Rosenbrock23()), 
-        callback = CallbackSet(am, et, es),
-        force_dtmin = true,
-        tstops = times,
-        maxiters = 1e7,
-        tspan = (1, 10_000)
-    );
-
-    sol[end]
-
-    f = WGLMakie.Figure()
-    ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Biomass")
-    empty!(ax)
-    for sp in species(fwm)
-
-        WGLMakie.lines!(ax, sol.t, sol[sp])
-    end
-
-    ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Preference")
-    empty!(ax)
-    for v in variables(fwm.vars, type = TRAIT_VARIABLE)
-
-        try
-
-            WGLMakie.lines!(ax, sol.t, sol[v])
-        catch
-
-            continue
+            cutup!(stuff, sols, fwm_num, seq_num)
         end
     end
 
-    richness(sol)
-
-    foodwebplot(fwm.hg;
-        draw_loops = false,
-        trophic_levels = true,
-        node_weights = 5
-    )
+    CSV.write("data.csv", stuff)
 
 end
+
+do_stuff()
+
+# df = CSV.read("data.csv", DataFrame)
+
+# traits, fwm, prob = build_my_stochastic_fwm(20, 0.3, 1, 0.2);
+
+# primary_extinctions = Vector{Tuple{Float64, Symbol}}()
+# secondary_extinctions = Vector{Tuple{Float64, Symbol}}()
+
+# times = collect((1_000.0:1_000.0:(richness(fwm) * 1_000.0)))
+# es = ExtinctionSequenceCallback(fwm, (shuffle ∘ species)(fwm), times;
+#     extinction_history = primary_extinctions
+# );
+# et = ExtinctionThresholdCallback(fwm, 1e-10;
+#     extinction_history = secondary_extinctions
+# );
+# am = AlphaManifoldCallback(fwm);
+
+# prob = remake(prob, 
+#     p = Dict(:g => 0.15)
+# )
+
+# sol = @time sols = solve(prob, 
+#     SOSRA(), 
+#     callback = CallbackSet(am, et, es),
+#     force_dtmin = true,
+#     tstops = times,
+#     maxiters = 1e7,
+#     tspan = (1, 10_000)
+# );
+
+# f = WGLMakie.Figure()
+# ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Biomass")
+# empty!(ax)
+# for sp in species(fwm)
+
+#     WGLMakie.lines!(ax, sol.t, sol[sp])
+# end
+
+# species(fwm)
+
+# WGLMakie.vlines!(ax, first.(primary_extinctions))
+# WGLMakie.vlines!(ax, first.(secondary_extinctions))
+
+# ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Preference")
+# empty!(ax)
+# for v in variables(fwm.vars, type = TRAIT_VARIABLE)
+
+#     try
+
+#         WGLMakie.lines!(ax, sol.t, sol[v])
+#     catch
+
+#         continue
+#     end
+# end
+
+# foodwebplot(fwm.hg;
+#     draw_loops = false,
+#     trophic_levels = true,
+#     node_weights = 5
+# )
+
+# richness(sol)
+
+# eig = eigenstability(sol)
+
+
+# WGLMakie.lines!(ax, sol.t, eig)

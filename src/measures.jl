@@ -1,37 +1,60 @@
 """
-    median_interaction_strength(sol, t)
+    median_interaction_strength(sol)
 
-Calculates the median interaction strength in the community at time `t`.
+Calculates the median interaction over time in the community.
 
 Interaction strength, here, is measured as preference parameters (α) of a
 consumer species on it's resources.
 """
-function median_interaction_strength(sol, t)
+function median_interaction_strength(sol, sp)
 
     fwm = sol.prob.f.sys
-    a_norms = Vector{Float64}()
 
-    for intx in interactions(fwm)
+    # A single interaction/rule should have all the relevant alpha variables.
+    f(x) = (subject(x) == sp) & (!isloop(x))
+    index = findfirst(f, interactions(fwm))
 
-        r = fwm.dynamic_rules[intx]
-        vs = r.vars
-        as = filter(x -> variable_type(fwm.vars, x) == TRAIT_VARIABLE, vs)
-    
-        if isempty(as)
+    # The case of a producer, no interactions with resouces found.
+    # The interaction strength and thus it's median will always be zero.
+    if isnothing(index)
 
-            continue
-        end
-
-        focal = as[1]
-
-        focal_val = sol(t, idxs = focal)
-        total_val = sum([sol(t, idxs = x) for x in as])
-
-        norm = focal_val / total_val
-        push!(a_norms, norm)
+        return zeros(Float64, length(sol.t))
     end
 
-    return median(a_norms)
+    intx = interactions(fwm)[index] 
+    rule = fwm.dynamic_rules[intx]
+    vars = filter(x -> variable_type(fwm, x) == TRAIT_VARIABLE, rule.vars)
+
+    # The case of a consumer with a single resource. It's median will always one.
+    if isempty(vars)
+
+        return ones(Float64, length(sol.t))
+    end
+
+    median_alpha = Vector{Float64}(undef, length(sol.t))
+
+    for t in eachindex(sol.t)
+
+        m = median([sol[v, t] for v in vars])
+        median_alpha[t] = m
+    end
+
+    return median_alpha
+end
+
+function median_interaction_strength(sol)
+
+    fwm = sol.prob.f.sys
+    out = Vector{Float64}(undef, length(sol.t))
+
+    median_alphas = [median_interaction_strength(sol, sp) for sp in species(fwm)]
+
+    for i in eachindex(sol.t)
+
+        out[i] = mean([x[i] for x in median_alphas])
+    end
+
+    return out 
 end
 
 """
@@ -104,8 +127,10 @@ end
 Calculate the real part of the leading eigenvalue of the jacobian matrix
 at every point t along the time series.
 """
-function eigenstability(sol; species_only = true)
- 
+function eigenstability(sol; species_only = true, sparseness = 1)
+
+    error("Broken, Don't use THIS!")    
+
     jac! = get_jacobian(sol) 
     fwm  = get_foodwebmodel(sol)
 
@@ -116,10 +141,17 @@ function eigenstability(sol; species_only = true)
 
     param_vals = get_value.(Ref(fwm.params), variables(fwm.params))
 
-    out = Vector{Float64}()
-    sizehint!(out, length(sol.t))
+    out = zeros(Float64, length(sol.t))
+    missing_points = (trues ∘ length)(sol.t)
 
-    for t in sol.t
+    for i in eachindex(sol.t)
+
+        if i % sparseness == 0 
+
+            continue
+        end
+
+        t = sol.t[i]
 
         jac!(jval, sol(t), param_vals, t)
 
@@ -129,13 +161,14 @@ function eigenstability(sol; species_only = true)
             e = (maxabs ∘ real)(eigen(jval).values)
         end
 
-        push!(out, e)
+        out[i] = e
+        missing_points[i] = false
     end
 
-    return out 
+    return (out, missing_points) 
 end
 
-function HigherOrderFoodwebs.richness(sol::ODESolution)
+function HigherOrderFoodwebs.richness(sol)
 
     out = Vector{Int64}()
     sizehint!(out, length(sol.t))
@@ -157,12 +190,12 @@ end
 
 # TODO Add check that these actually exist. The sol isn't guaranteed to be
 # coming from HigherOrderFoodwebs
-function get_foodwebmodel(sol::ODESolution)
+function get_foodwebmodel(sol)
 
     return sol.prob.f.sys
 end
 
-function get_jacobian(sol::ODESolution)
+function get_jacobian(sol)
 
     return sol.prob.f.jac
 end
