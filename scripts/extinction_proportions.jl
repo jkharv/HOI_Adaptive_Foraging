@@ -82,12 +82,9 @@ function sims(
         am = AlphaManifoldCallback(fwm);
         cb = CallbackSet(et, es, am);
 
-        noise = WienerProcess(0.0, zeros(Float64, size(prob.u0)), zeros(Float64, size(prob.u0)))
-
         return remake(prob, 
             callback = cb,
             p = Dict(:g => gs[i]),
-            noise = noise
         )
     end
 
@@ -122,7 +119,7 @@ function sims(
     )
 
     @time sols = solve(eprob, 
-        SOSRA(), 
+        AutoTsit5(Rosenbrock23()), 
         EnsembleThreads(); 
         force_dtmin = true,
         maxiters = 1e7,
@@ -210,11 +207,12 @@ function do_stuff()
 
     stuff = DataFrame()
 
-    for fwm_num in 1:1
+    for fwm_num in 1:20
 
-        traits, fwm, prob = build_my_stochastic_fwm(10, 0.3, 2, 0.0);
+        traits, fwm = build_my_fwm(10, 0.3, 2, 0.2);
+        prob = assemble_foodweb(fwm; extra_transient_time = 1_000, reltol = 1e-3, abstol = 1e-3)
 
-        for seq_num in 1:3
+        for seq_num in 1:5
 
             seq = (shuffle ∘ species)(fwm)
             times = collect((1_000.0:1_000.0:(length(seq) * 1_000.0)))
@@ -236,42 +234,52 @@ do_stuff()
 
 # df = CSV.read("data.csv", DataFrame)
 
-# traits, fwm, prob = build_my_stochastic_fwm(20, 0.3, 1, 0.2);
+# traits, fwm = build_my_fwm(10, 0.3, 5, 0.0);
+
+# # set_u0!(fwm, Dict(species(fwm) .=> (rand ∘ richness)(fwm)))
+# # prob = ODEProblem(fwm)
+
+# prob = assemble_foodweb(fwm; extra_transient_time = 1_000, reltol = 1e-3, abstol = 1e-3)
+
+# begin 
 
 # primary_extinctions = Vector{Tuple{Float64, Symbol}}()
 # secondary_extinctions = Vector{Tuple{Float64, Symbol}}()
 
-# times = collect((1_000.0:1_000.0:(richness(fwm) * 1_000.0)))
+# times = collect((5_000.0:5_000.0:((richness(fwm) + 5) * 1_000.0)))
 # es = ExtinctionSequenceCallback(fwm, (shuffle ∘ species)(fwm), times;
 #     extinction_history = primary_extinctions
 # );
-# et = ExtinctionThresholdCallback(fwm, 1e-10;
+# et = ExtinctionThresholdCallback(fwm, 1e-20;
 #     extinction_history = secondary_extinctions
 # );
 # am = AlphaManifoldCallback(fwm);
 
 # prob = remake(prob, 
-#     p = Dict(:g => 0.15)
+#     p = Dict(:g => 0.0)
 # )
 
 # sol = @time sols = solve(prob, 
-#     SOSRA(), 
+#     AutoTsit5(Rosenbrock23()), 
 #     callback = CallbackSet(am, et, es),
 #     force_dtmin = true,
 #     tstops = times,
 #     maxiters = 1e7,
-#     tspan = (1, 10_000)
+#     tspan = (1, (richness(fwm) + 15) * 1_000)
 # );
+
+# end;
 
 # f = WGLMakie.Figure()
 # ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Biomass")
 # empty!(ax)
 # for sp in species(fwm)
-
+ 
 #     WGLMakie.lines!(ax, sol.t, sol[sp])
 # end
 
-# species(fwm)
+# WGLMakie.lines!(ax, sol.t, richness(sol))
+# empty!(ax)
 
 # WGLMakie.vlines!(ax, first.(primary_extinctions))
 # WGLMakie.vlines!(ax, first.(secondary_extinctions))
@@ -294,10 +302,3 @@ do_stuff()
 #     trophic_levels = true,
 #     node_weights = 5
 # )
-
-# richness(sol)
-
-# eig = eigenstability(sol)
-
-
-# WGLMakie.lines!(ax, sol.t, eig)

@@ -17,7 +17,7 @@ function build_my_stochastic_fwm(s, c, b, gval)
     traits.niche_centre = traits.niche_lower .+ traits.niche_radius
 
     # Body Mass
-    mass_ratio = 1000;
+    mass_ratio = 10000;
     f_mass(tl) = mass_ratio^tl;
     traits.mass = f_mass.(traits.trophic_level);
 
@@ -157,8 +157,5 @@ function build_my_stochastic_fwm(s, c, b, gval)
         fwm.dynamic_rules[i] = DynamicRule(fwd, bwd)
     end
 
-    set_u0!(fwm, Dict(species(fwm) .=> rand(richness(fwm))))
-    prob = SDEProblem(fwm, HigherOrderFoodwebs.default_noise(fwm, 0.01), compile_symbolics = true, compile_jacobian = true)
-
-    return (traits, fwm, prob)
+    return (traits, fwm)
 end

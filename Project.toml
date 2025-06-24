@@ -27,6 +27,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 [sources]
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl"}
 SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
+FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl"}
 
 [compat]
 ADTypes = "1.14.0"
