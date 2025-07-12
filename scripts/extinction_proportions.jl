@@ -19,10 +19,10 @@ using DataFrames
 using StatsBase
 using CSV
 
-import WGLMakie
-using FoodwebPlots
 include("my_model.jl")
 include("my_stochastic_model.jl")
+
+@info "Dependencies Loaded"
 
 """
     extra_save_points(times)
@@ -207,12 +207,18 @@ function do_stuff()
 
     stuff = DataFrame()
 
-    for fwm_num in 1:20
+    for fwm_num in 1:1
 
-        traits, fwm = build_my_fwm(10, 0.3, 2, 0.2);
+        @info "Begining iteration $fwm_num"
+
+        traits, fwm = build_my_fwm(5, 0.3, 1, 0.2);
         prob = assemble_foodweb(fwm; extra_transient_time = 1_000, reltol = 1e-3, abstol = 1e-3)
 
-        for seq_num in 1:5
+        @info "Assembled FoodwebModel $fwm_num"
+
+        for seq_num in 1:2
+
+            @info "Running FoodwebModel $fwm_num, sequence number @seq_num"
 
             seq = (shuffle ∘ species)(fwm)
             times = collect((1_000.0:1_000.0:(length(seq) * 1_000.0)))
@@ -228,77 +234,7 @@ function do_stuff()
 
     CSV.write("data.csv", stuff)
 
+    @info "Done!"
 end
 
 do_stuff()
-
-# df = CSV.read("data.csv", DataFrame)
-
-# traits, fwm = build_my_fwm(10, 0.3, 5, 0.0);
-
-# # set_u0!(fwm, Dict(species(fwm) .=> (rand ∘ richness)(fwm)))
-# # prob = ODEProblem(fwm)
-
-# prob = assemble_foodweb(fwm; extra_transient_time = 1_000, reltol = 1e-3, abstol = 1e-3)
-
-# begin 
-
-# primary_extinctions = Vector{Tuple{Float64, Symbol}}()
-# secondary_extinctions = Vector{Tuple{Float64, Symbol}}()
-
-# times = collect((5_000.0:5_000.0:((richness(fwm) + 5) * 1_000.0)))
-# es = ExtinctionSequenceCallback(fwm, (shuffle ∘ species)(fwm), times;
-#     extinction_history = primary_extinctions
-# );
-# et = ExtinctionThresholdCallback(fwm, 1e-20;
-#     extinction_history = secondary_extinctions
-# );
-# am = AlphaManifoldCallback(fwm);
-
-# prob = remake(prob, 
-#     p = Dict(:g => 0.0)
-# )
-
-# sol = @time sols = solve(prob, 
-#     AutoTsit5(Rosenbrock23()), 
-#     callback = CallbackSet(am, et, es),
-#     force_dtmin = true,
-#     tstops = times,
-#     maxiters = 1e7,
-#     tspan = (1, (richness(fwm) + 15) * 1_000)
-# );
-
-# end;
-
-# f = WGLMakie.Figure()
-# ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Biomass")
-# empty!(ax)
-# for sp in species(fwm)
- 
-#     WGLMakie.lines!(ax, sol.t, sol[sp])
-# end
-
-# WGLMakie.lines!(ax, sol.t, richness(sol))
-# empty!(ax)
-
-# WGLMakie.vlines!(ax, first.(primary_extinctions))
-# WGLMakie.vlines!(ax, first.(secondary_extinctions))
-
-# ax = WGLMakie.Axis(f[1,1], xlabel = "time", ylabel = "Preference")
-# empty!(ax)
-# for v in variables(fwm.vars, type = TRAIT_VARIABLE)
-
-#     try
-
-#         WGLMakie.lines!(ax, sol.t, sol[v])
-#     catch
-
-#         continue
-#     end
-# end
-
-# foodwebplot(fwm.hg;
-#     draw_loops = false,
-#     trophic_levels = true,
-#     node_weights = 5
-# )
