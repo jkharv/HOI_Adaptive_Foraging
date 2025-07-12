@@ -4,3 +4,6 @@ output/*
 data.csv
 apptainer/*
 *.png
+
+*.csv
+figures/*
