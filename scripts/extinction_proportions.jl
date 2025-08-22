@@ -3,9 +3,6 @@ include("../src/HOI_Adaptive_Foraging.jl")
 using .HOI_Adaptive_Foraging
 
 using OrdinaryDiffEqTsit5
-using OrdinaryDiffEqRosenbrock
-using DiffEqNoiseProcess
-using StochasticDiffEq
 
 using SpeciesInteractionNetworks
 using HigherOrderFoodwebs
@@ -20,7 +17,6 @@ using StatsBase
 using CSV
 
 include("my_model.jl")
-include("my_stochastic_model.jl")
 
 @info "Dependencies Loaded"
 
@@ -212,13 +208,22 @@ function do_stuff()
         @info "Begining iteration $fwm_num"
 
         traits, fwm = build_my_fwm(5, 0.3, 1, 0.2);
-        prob = assemble_foodweb(fwm; extra_transient_time = 1_000, reltol = 1e-3, abstol = 1e-3)
+
+        prob = ODEProblem(fwm;
+            compile_symbolics = true,
+            compile_jacobian  = false 
+        )
+
+        prob = assemble_foodweb(prob; 
+            solver = Rosenbrock23(autodiff = false),
+            extra_transient_time = 1_000
+        )
 
         @info "Assembled FoodwebModel $fwm_num"
 
         for seq_num in 1:2
 
-            @info "Running FoodwebModel $fwm_num, sequence number @seq_num"
+            @info "Running FoodwebModel $fwm_num, sequence number $seq_num"
 
             seq = (shuffle ∘ species)(fwm)
             times = collect((1_000.0:1_000.0:(length(seq) * 1_000.0)))
