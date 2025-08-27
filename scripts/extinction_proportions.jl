@@ -6,8 +6,9 @@ using OrdinaryDiffEqTsit5
 
 using SpeciesInteractionNetworks
 using HigherOrderFoodwebs
+using RuntimeGeneratedFunctions
+RuntimeGeneratedFunctions.init(@__MODULE__)
 
-using Symbolics
 using Random
 using LinearAlgebra
 using Statistics
@@ -19,32 +20,6 @@ using CSV
 include("my_model.jl")
 
 @info "Dependencies Loaded"
-
-"""
-    extra_save_points(times)
-
-Returns a `Vector{Float64}` of extra points placed before and after the points given in
-`times`. Useful for adding extra savepoints around discontinuos changes in an ODE.
-Inludes the time points given in `times` themselves.
-"""
-function extra_save_points(times::Vector{Float64}; n = 5, window = 5.0)
-
-    ret = Vector{Float64}()
-
-    density = n / window
-
-    for t in times
-
-        t1 = max(0, t - window/2)
-        t2 = t + window/2
-
-        pts_before = collect(t1:density:t)
-        pts_after  = collect(t:density:t2)
-        append!(ret, union(pts_before, pts_after))
-    end
-
-    return ret
-end
 
 function sims(
     traits, 
@@ -115,11 +90,11 @@ function sims(
     )
 
     @time sols = solve(eprob, 
-        AutoTsit5(Rosenbrock23()), 
+        Tsit5(), 
         EnsembleThreads(); 
         force_dtmin = true,
         maxiters = 1e7,
-        tstops = extra_save_points(extinction_times), 
+        tstops = extinction_times, 
         trajectories = ntrajectories, 
         tspan = (1, 10_000 * n_extinctions + 1_000)
     );
@@ -203,25 +178,22 @@ function do_stuff()
 
     stuff = DataFrame()
 
-    for fwm_num in 1:1
+    for fwm_num in 1:5
 
         @info "Begining iteration $fwm_num"
 
-        traits, fwm = build_my_fwm(5, 0.3, 1, 0.2);
+        traits, fwm = build_my_fwm(50, 0.3, 5, 0.2);
 
-        prob = ODEProblem(fwm;
-            compile_symbolics = true,
-            compile_jacobian  = false 
-        )
+        prob = ODEProblem(fwm)
 
         prob = assemble_foodweb(prob; 
-            solver = Rosenbrock23(autodiff = false),
+            solver = Tsit5(),
             extra_transient_time = 1_000
         )
 
         @info "Assembled FoodwebModel $fwm_num"
 
-        for seq_num in 1:2
+        for seq_num in 1:10
 
             @info "Running FoodwebModel $fwm_num, sequence number $seq_num"
 
@@ -242,4 +214,4 @@ function do_stuff()
     @info "Done!"
 end
 
-do_stuff()
+@profview do_stuff()
