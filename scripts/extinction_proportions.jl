@@ -21,19 +21,18 @@ include("my_model.jl")
 
 @info "Dependencies Loaded"
 
-function sims(
+function simulation_batch(
     traits, 
     fwm, 
     prob;
     extinction_order = shuffle(species(fwm)),
-    extinction_times = missing
-    )
-
-    s = richness(fwm) 
-    n_extinctions = length(extinction_times)
+    extinction_times = missing,
+    g1 = 0.0,
+    g2 = 0.5,
     ntrajectories = 5
-    g1 = 0.0
-    g2 = 0.5
+    )
+ 
+    n_extinctions = length(extinction_times)  
     stepsize = (g2 - g1)/(ntrajectories - 1)
     gs = collect(g1:stepsize:g2)
 
@@ -61,24 +60,11 @@ function sims(
 
     function out_func(sol, i)
 
-        prefs = median_interaction_strength(sol)
-        pop_cvs = time_window_population_cv(sol, 10.0;
-            window_alignment = :LEFT
-        )
-        com_cvs = time_window_community_cv(sol, 5.0;
-            window_alignment = :LEFT
-        )        
-
-        ret = (
-            sol = sol,
-            t = sol.t, 
-            primary_extinctions = primary_extinctions[i],
-            secondary_extinctions = secondary_extinctions[i],
-            richness = richness(sol),
-            median_alpha = prefs, 
-            pop_cv = pop_cvs, 
-            com_cv  = com_cvs,
-            g = gs[i]
+        ret = process_solution(
+            sol, 
+            gs[i], 
+            primary_extinctions[i], 
+            secondary_extinctions[i]
         )
 
         return (ret, false)
@@ -107,17 +93,22 @@ function index_of_time(sol, t)
     return findfirst(x -> x == t, sol.t)
 end
 
-function extinction_indices(sol)
+function count_secondary_extinctions(secondary_extinctions, t1, t2)
+
+    return count(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+end
+
+function extinction_indices(sol, primary_extinctions)
 
     indices = Vector{Tuple{Symbol, Int64, Int64}}()
 
-    for (i, (t, sp)) in enumerate(sol.primary_extinctions)
+    for (i, (t, sp)) in enumerate(primary_extinctions)
       
         i1 = index_of_time(sol, t)        
 
-        if i + 1 <= length(sol.primary_extinctions)
+        if i + 1 <= length(primary_extinctions)
 
-            t_next, sp_next = sol.primary_extinctions[i + 1]            
+            t_next, sp_next = primary_extinctions[i + 1]            
             i2 = index_of_time(sol, t_next)
         else
 
@@ -130,62 +121,53 @@ function extinction_indices(sol)
     return indices
 end
 
-function cutup!(df, sols, foodweb_id = missing, sequence_id = missing)
+function process_solution(sol, g, primary_extinctions, secondary_extinctions)
 
-    for sol in sols
+    idxs = extinction_indices(sol, primary_extinctions)
+    df = DataFrame()
 
-        idxs = extinction_indices(sol)
+    richness_sol = richness(sol)
 
-        for (sp, i1, i2) in idxs 
+    for (sp, i1, i2) in idxs 
 
-            push!(df, (
-                retcode = sol.sol.retcode,
-                foodweb_id = foodweb_id,
-                sequence_id = sequence_id,
-                g = sol.g,
-                extinction_species = sp,
-                richness_pre = sol.richness[i1-1],
-                richness_post = sol.richness[i2-1],
-                secondary_extinctions = secondary_extinctions_over_period(sol, i1, i2),
-                t1 = sol.t[i1],
-                t2 = sol.t[i2],
-                median_alpha = sol.median_alpha[i1:i2],
-                pop_cv = sol.pop_cv[i1:i2],
-                com_cv = sol.com_cv[i1:i2]
-            ))
-        end
-    end
-end
+        t1 = sol.t[i1]
+        t2 = sol.t[i2]
 
-function secondary_extinctions_over_period(sol, id1, id2)
-
-    secondary_extinctions = 0
-    t1 = sol.t[id1]
-    t2 = sol.t[id2]
-
-    for (t, sp) in sol.secondary_extinctions
-
-        if t1 < t < t2
-
-            secondary_extinctions += 1
-        end
+        push!(df, (
+            retcode = sol.retcode,
+            g = g,
+            extinction_species = sp,
+            richness_pre = richness_sol[i1-1],
+            richness_post = richness_sol[i2-1],
+            secondary_extinctions = count_secondary_extinctions(secondary_extinctions, t1, t2),
+            t1 = sol.t[i1],
+            t2 = sol.t[i2],
+        ))
     end
 
-    return secondary_extinctions
+    return df
 end
 
-function do_stuff()
+function simulations(;
+    species_richness = 20,
+    connectance = 0.3,
+    minimum_basal_species = 5,
+    number_of_foodwebs  = 5,
+    number_of_sequences = 10,
+    time_between_extinctions = 1_000.0
+)
 
-    stuff = DataFrame()
+    for fwm_num in 1:number_of_foodwebs
 
-    for fwm_num in 1:5
+        @info "Assembeling FoodwebModel $fwm_num of $number_of_foodwebs"
 
-        @info "Begining iteration $fwm_num"
-
-        traits, fwm = build_my_fwm(50, 0.3, 5, 0.2);
-
+        traits, fwm = build_my_fwm(
+            species_richness, 
+            connectance, 
+            minimum_basal_species, 
+            0.2 
+        );
         prob = ODEProblem(fwm)
-
         prob = assemble_foodweb(prob; 
             solver = Tsit5(),
             extra_transient_time = 1_000
@@ -193,25 +175,38 @@ function do_stuff()
 
         @info "Assembled FoodwebModel $fwm_num"
 
-        for seq_num in 1:10
+        for seq_num in 1:number_of_sequences
 
-            @info "Running FoodwebModel $fwm_num, sequence number $seq_num"
+            @info "Running FoodwebModel $fwm_num, sequence number $seq_num of $number_of_sequences"
 
             seq = (shuffle ∘ species)(fwm)
-            times = collect((1_000.0:1_000.0:(length(seq) * 1_000.0)))
+            times = collect((1_000.0:time_between_extinctions:(length(seq) * 1_000.0)))
 
-            sols = sims(traits, fwm, prob;
+            sols = simulation_batch(traits, fwm, prob;
                 extinction_times = times,
                 extinction_order = seq
             );
 
-            cutup!(stuff, sols, fwm_num, seq_num)
+            data = vcat(sols...)
+            data[!, :foodweb_number] .= fwm_num
+            data[!, :sequence_number] .= seq_num 
+
+            if (fwm_num == 1) & (seq_num == 1)
+                
+                CSV.write("data.csv", data)
+            else
+
+                CSV.write("data.csv", data; append = true)
+            end
         end
     end
-
-    CSV.write("data.csv", stuff)
-
+    
     @info "Done!"
 end
 
-@profview do_stuff()
+simulations(
+    species_richness = 30,
+    minimum_basal_species = 5,
+    number_of_foodwebs = 2,
+    number_of_sequences = 5
+)
