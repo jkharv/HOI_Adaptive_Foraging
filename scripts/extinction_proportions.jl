@@ -16,8 +16,12 @@ using Distributions
 using DataFrames
 using StatsBase
 using CSV
+using Dates
+using JLD2
 
 include("my_model.jl")
+
+OUTPUT_DIR = ""
 
 @info "Dependencies Loaded"
 
@@ -148,29 +152,70 @@ function process_solution(sol, g, primary_extinctions, secondary_extinctions)
     return df
 end
 
+function make_output_dir!()
+
+    global OUTPUT_DIR = "simulation-output-" * string(Dates.today())
+    mkdir(OUTPUT_DIR)
+
+    return
+end
+
+function save_parameters!(; kwargs...)
+
+    open(OUTPUT_DIR * "/simulation-parameters.txt", "a") do io 
+        for args in kwargs
+
+            println(io, args)
+        end
+    end
+
+    return
+end
+
 function simulations(;
     species_richness = 20,
     connectance = 0.3,
     minimum_basal_species = 5,
     number_of_foodwebs  = 5,
     number_of_sequences = 10,
+    ntrajectories = 10,
+    g1 = 0.0,
+    g2 = 0.5,
     time_between_extinctions = 1_000.0
-)
+    )
 
+    make_output_dir!()
+
+    save_parameters!(
+        species_richness = species_richness,
+        connectance = connectance,
+        minimum_basal_species = minimum_basal_species,
+        number_of_foodwebs = number_of_foodwebs,
+        number_of_sequences = number_of_sequences,
+        ntrajectories = ntrajectories,   
+        g1 = g1,
+        g2 = g2,
+        time_between_extinctions = time_between_extinctions   
+    )
+ 
     for fwm_num in 1:number_of_foodwebs
 
         @info "Assembeling FoodwebModel $fwm_num of $number_of_foodwebs"
 
         traits, fwm = build_my_fwm(
-            species_richness, 
-            connectance, 
-            minimum_basal_species, 
-            0.2 
-        );
+            species_richness,
+            connectance,
+            minimum_basal_species,
+            0.2
+        )
         prob = ODEProblem(fwm)
-        prob = assemble_foodweb(prob; 
+        prob = assemble_foodweb(prob;
             solver = Tsit5(),
             extra_transient_time = 1_000
+        )
+
+        jldsave(OUTPUT_DIR * "/foodweb_$fwm_num.jld2", true; 
+            web = fwm.hg, traits = traits
         )
 
         @info "Assembled FoodwebModel $fwm_num"
@@ -193,10 +238,10 @@ function simulations(;
 
             if (fwm_num == 1) & (seq_num == 1)
                 
-                CSV.write("data.csv", data)
+                CSV.write(OUTPUT_DIR * "/data.csv", data)
             else
 
-                CSV.write("data.csv", data; append = true)
+                CSV.write(OUTPUT_DIR * "/data.csv", data; append = true)
             end
         end
     end
@@ -205,7 +250,7 @@ function simulations(;
 end
 
 simulations(
-    species_richness = 30,
+    species_richness = 20,
     minimum_basal_species = 5,
     number_of_foodwebs = 2,
     number_of_sequences = 5
