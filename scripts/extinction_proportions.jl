@@ -229,7 +229,10 @@ function simulations(;
 
             sols = simulation_batch(traits, fwm, prob;
                 extinction_times = times,
-                extinction_order = seq
+                extinction_order = seq,
+                g1 = g1,
+                g2 = g2,
+                ntrajectories = ntrajectories
             );
 
             data = vcat(sols...)
