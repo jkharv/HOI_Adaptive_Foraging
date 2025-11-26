@@ -1,12 +1,13 @@
-using CairoMakie
+using WGLMakie
 using DataFrames
 using CSV
 using GLM
 using Statistics
 using CategoricalArrays
 
-df = CSV.read("data_narval_s15_8g.csv", DataFrame)
+df = CSV.read("simulation-output-2025-09-24/data.csv", DataFrame)
 
+# Extremely low richness is v noisy.
 filter!(:richness_pre => x-> x >= 5, df)
 # Some (very few) of the simulation end early because of instability or
 # something. We can just exclude those to be safe. Including them or not didn't
@@ -21,38 +22,38 @@ transform!(df, [:richness_pre, :secondary_extinctions] => f => :extinction_propo
 # be plotted later in the file.
 # ------------------------------------------------------------------------------
 
-df_all_richness = df
-df_high_richness = filter(:richness_pre => x-> x >= 10, df)
+df_low_richness = filter(:richness_pre => x-> x < 15, df)
+df_high_richness = filter(:richness_pre => x-> x >= 15, df)
 
-gd_all_richness = groupby(df_all_richness, :g)
+gd_low_richness = groupby(df_low_richness, :g)
 gd_high_richness = groupby(df_high_richness, :g)
 
 # Probability of at least one extinction occuring
 f(x) = count(!iszero, x) / length(x)
-p_extinction_all_richness = combine(gd_all_richness, 
-    :extinction_proportion => f => :prob_extinction_all_richness
+p_extinction_low_richness = combine(gd_low_richness, 
+    :extinction_proportion => f => :prob_extinction_low_richness
 )
 p_extinction_high_richness = combine(gd_high_richness, 
     :extinction_proportion => f => :prob_extinction_high_richness
 )
 
 # Expected number of secondary extinctions given that at least one occurs.
-df_all_richness_no_zero = filter(:secondary_extinctions => !iszero, df_all_richness)
+df_low_richness_no_zero = filter(:secondary_extinctions => !iszero, df_low_richness)
 df_high_richness_no_zero = filter(:secondary_extinctions => !iszero, df_high_richness)
 
-gd_all_richness_no_zero = groupby(df_all_richness_no_zero, :g)
+gd_low_richness_no_zero = groupby(df_low_richness_no_zero, :g)
 gd_high_richness_no_zero = groupby(df_high_richness_no_zero, :g)
 
-exp_n_extinctions_all_richness = combine(gd_all_richness_no_zero, 
-    :extinction_proportion => mean => :expected_secondary_extinctions_all_richness
+exp_n_extinctions_low_richness = combine(gd_low_richness_no_zero, 
+    :extinction_proportion => mean => :expected_secondary_extinctions_low_richness
 )
 exp_n_extinctions_high_richness = combine(gd_high_richness_no_zero, 
     :extinction_proportion => mean => :expected_secondary_extinctions_high_richness
 )
 
 # We can combine those into one dataframe to make our lives easier.
-df_derived = leftjoin(p_extinction_all_richness, p_extinction_high_richness; on = :g)
-leftjoin!(df_derived, exp_n_extinctions_all_richness; on = :g)
+df_derived = leftjoin(p_extinction_low_richness, p_extinction_high_richness; on = :g)
+leftjoin!(df_derived, exp_n_extinctions_low_richness; on = :g)
 leftjoin!(df_derived, exp_n_extinctions_high_richness; on = :g)
 
 # ----------------------------------------------------------------------------
@@ -64,8 +65,37 @@ leftjoin!(df_derived, exp_n_extinctions_high_richness; on = :g)
 # Expected proportion of community to go extinct given that at least one
 # secondary extinction occurs.
 #
-# One line for richnesses 5-15, another for richnesses 13-15.
+# One version for low richness (< 15). One for high richness (≥ 15) 
 # ----------------------------------------------------------------------------
+
+fig = Figure(size = (1000, 500)) 
+panel1 = Axis(fig[1,1], 
+    xlabel = "Rate of foraging adaptation",
+    ylabel = "Probability of at least one secondary extinction",
+    title = "Probability of extinction",
+    xticks = unique(df[:, :g]),
+    xtickformat = "{:.2f}"
+)
+lines!(panel1, 
+    df_derived[:, :g], 
+    df_derived[:, :prob_extinction_low_richness],
+    color = :black
+)
+
+panel2 = Axis(fig[1,2], 
+    xlabel = "Rate of foraging adaptation",
+    ylabel = "Expected proportion of community extinctions",
+    title = "Expected proportion of community extinct",
+    xticks = unique(df[:, :g]),
+    xtickformat = "{:.2f}"
+)
+low_richness_line = lines!(panel2, 
+    df_derived[:, :g], 
+    df_derived[:, :expected_secondary_extinctions_low_richness],
+    color = :black
+)
+
+save("figures/g_v_prob_and_expectation_low_richness.png", fig)
 
 fig = Figure(size = (1000, 500)) 
 panel1 = Axis(fig[1,1], 
@@ -80,11 +110,6 @@ lines!(panel1,
     df_derived[:, :prob_extinction_high_richness],
     color = :red
 )
-lines!(panel1, 
-    df_derived[:, :g], 
-    df_derived[:, :prob_extinction_all_richness],
-    color = :black
-)
 
 panel2 = Axis(fig[1,2], 
     xlabel = "Rate of foraging adaptation",
@@ -93,23 +118,13 @@ panel2 = Axis(fig[1,2],
     xticks = unique(df[:, :g]),
     xtickformat = "{:.2f}"
 )
-high_richness_line = lines!(panel2, 
+lines!(panel2, 
     df_derived[:, :g], 
     df_derived[:, :expected_secondary_extinctions_high_richness],
     color = :red
 )
-all_richness_line = lines!(panel2, 
-    df_derived[:, :g], 
-    df_derived[:, :expected_secondary_extinctions_all_richness],
-    color = :black
-)
 
-Legend(fig[1,2][-1, 2], 
-    [all_richness_line, high_richness_line], 
-    ["All richness (5-15)", "High richness (13-15)"]
-)
-
-save("figures/g_v_prob_and_expectation.svg", fig)
+save("figures/g_v_prob_and_expectation_high_richness.png", fig)
 
 # ------------------------------------------------------------------------------
 # Panel 1
@@ -126,12 +141,13 @@ save("figures/g_v_prob_and_expectation.svg", fig)
 # ------------------------------------------------------------------------------
 
 filt = filter(:extinction_proportion => x -> x > 0, df)
+filt = filter(:richness_pre => x -> x < 15, filt)
 
 fig = Figure(size = (1000, 500)) 
 panel1 = Axis(fig[1,1], 
     xlabel = "Rate of foraging adaptation",
     ylabel = "Proportion of community extinct",
-    title = "All richnesses (5-15)",
+    title = "Low Richness (< 15)",
     xticks = unique(df[:, :g]),
     xtickformat = "{:.2f}"
 )
@@ -142,11 +158,12 @@ boxplot!(panel1,
     width = 0.05
 )
 
-filter!(:richness_pre => x -> x >= 13, filt)
+filt = filter(:extinction_proportion => x -> x > 0, df)
+filt = filter(:richness_pre => x -> x ≥ 15, filt)
 
 panel2 = Axis(fig[1,2], 
     xlabel = "Rate of foraging adaptation",
-    title = "High richnesses only (13-15)",
+    title = "High richnesses (≥ 15)",
     xticks = unique(df[:, :g]),
     xtickformat = "{:.2f}"
 )
@@ -157,7 +174,77 @@ boxplot!(panel2,
     width = 0.05,
 )
 
-save("figures/g_v_secondary_extinctions.svg", fig)
+save("figures/g_v_secondary_extinctions.png", fig)
+
+# ---------------------------------------------------------------------- 
+# Quantiles of cascade size distribution by g 
+# ---------------------------------------------------------------------- 
+
+filt = filter(:extinction_proportion => x -> x > 0, df)
+filt = filter(:richness_pre => x -> x < 15, filt)
+
+fig = Figure(size = (1000, 500)) 
+
+quantiles_low = DataFrame()
+
+for g in unique(filt[:, :g])
+
+    f = filter(:g => x -> x == g, filt)
+
+    push!(quantiles_low, (
+        g = g,
+        q50 = quantile(f[:, :extinction_proportion], 0.5),
+        q90 = quantile(f[:, :extinction_proportion], 0.9),
+        q99 = quantile(f[:, :extinction_proportion], 0.99),
+    ))
+end
+sort!(quantiles_low. :g)
+
+panel1 = Axis(fig[1,1], 
+    xlabel = "Rate of foraging adaptation",
+    ylabel = "Proportion of community extinct",
+    title = "Low Richness (< 15)",
+    xticks = unique(df[:, :g]),
+    xtickformat = "{:.2f}"
+)
+lines!(panel1, quantiles_low[:, :g], quantiles_low[:, :q50])
+lines!(panel1, quantiles_low[:, :g], quantiles_low[:, :q90])
+lines!(panel1, quantiles_low[:, :g], quantiles_low[:, :q99])
+
+filt = filter(:extinction_proportion => x -> x > 0, df)
+filt = filter(:richness_pre => x -> x ≥ 15, filt)
+
+quantiles_high = DataFrame()
+
+for g in unique(filt[:, :g])
+
+    f = filter(:g => x -> x == g, filt)
+
+    push!(quantiles_high, (
+        g = g,
+        q50 = quantile(f[:, :extinction_proportion], 0.5),
+        q90 = quantile(f[:, :extinction_proportion], 0.9),
+        q99 = quantile(f[:, :extinction_proportion], 0.99),
+    ))
+end
+sort!(quantiles_high, :g)
+
+panel2 = Axis(fig[1,2], 
+    xlabel = "Rate of foraging adaptation",
+    title = "High richnesses (≥ 15)",
+    xticks = unique(df[:, :g]),
+    xtickformat = "{:.2f}"
+)
+q50 = lines!(panel2, quantiles_high[:, :g], quantiles_high[:, :q50])
+q90 = lines!(panel2, quantiles_high[:, :g], quantiles_high[:, :q90])
+q99 = lines!(panel2, quantiles_high[:, :g], quantiles_high[:, :q99])
+
+Legend(fig[1,2][-1,2],
+    [q50, q90, q99],
+    ["50th Percentile", "90th Percentile", "99th Percentile"] 
+)
+
+save("figures/g_v_secondary_extinctions_quantiles.png", fig)
 
 # ---------------------------------------------------------------------- 
 # Coefficient of regression against g at multiple values of richness pre 
@@ -189,6 +276,6 @@ save("figures/g_effect_v_richness_pre.png", fig)
 
 # --------------------------------------------------------
 # Linear model 
-#
+# --------------------------------------------------------
 
 mm = lm(@formula(extinction_proportion ~  g * richness_pre), df)
