@@ -68,7 +68,8 @@ df = DataFrame()
 
 for i in 1:10
 
-    traits, fwm = build_my_fwm(10, 0.3, 5, 0.2)
+    web = niche_model_min_basal(10, 0.3, 5)
+    traits, fwm = build_my_fwm(web, 0.2)
 
     prob = ODEProblem(fwm)
     prob = assemble_foodweb(prob; solver = Tsit5(), extra_transient_time = 1_000)

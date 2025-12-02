@@ -25,7 +25,8 @@ function sims()
     s = 5
     n_extinctions = s/2
     ntrajectories = 5
-    traits, fwm, prob = build_my_fwm(s, 0.3, 2, 0.5);
+    web = niche_model_min_basal(s, 0.3, 2)
+    traits, fwm = build_my_fwm(web, 0.5);
     primary_extinctions = Vector{Tuple{Float64, Symbol}}()
 
     # es = ExtinctionSequenceCallback(fwm, shuffle(species(fwm)), 5000.0);

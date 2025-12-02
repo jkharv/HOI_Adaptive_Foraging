@@ -1,7 +1,3 @@
-using Combinatorics
-using HigherOrderFoodwebs
-using SpeciesInteractionNetworks
-
 function rectangular_web(width::Int64, height::Int64)
 
     spp   = Vector{Vector{Symbol}}(undef, height) 

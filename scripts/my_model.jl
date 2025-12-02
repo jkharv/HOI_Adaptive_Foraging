@@ -22,23 +22,18 @@ function holling_disk(B_focal, a_focal, B_all, a_all, b0)
     return (B_focal * a_focal) / (b0 + (a_all ⋅ B_all))
 end
 
-function build_my_fwm(s, c, b, gval)
+function build_my_fwm(web, gval)
 
-    web, _, traits = niche_model_min_basal(s, c, b)
-    fwm = (FoodwebModel ∘ optimal_foraging)(web)
+    fwm = (FoodwebModel ∘ optimal_foraging)(web) 
 
     # --------------- #
     # Add some params #
     # --------------- #
 
+    traits = DataFrame(species = species(web))
     traits.vulnerability = vulnerability.(Ref(fwm.hg), traits.species);
     traits.generality = generality.(Ref(fwm.hg), traits.species);
     traits.trophic_level = distancetobase.(Ref(fwm.hg), traits.species, mean);
-
-    # Niche stuff
-    traits.niche_diameter = traits.niche_upper .- traits.niche_lower;
-    traits.niche_radius = traits.niche_diameter ./ 2
-    traits.niche_centre = traits.niche_lower .+ traits.niche_radius
 
     # Body Mass
     mass_ratio = 1000;
@@ -125,16 +120,8 @@ function build_my_fwm(s, c, b, gval)
         s = subject(intx)
         o = object(intx)
 
-        s_niche_centre = traits[traits.species .== s, :niche_centre][1]
-        s_niche_radius  = traits[traits.species .== s, :niche_radius][1]
-        o_trait_value  = traits[traits.species .== o, :trait_value][1]
-
-        e_value = scaled_assimilation_efficiency(
-            s_niche_radius, 
-            s_niche_centre, 
-            o_trait_value
-        )
-
+        e_value = rand(truncated(Normal(0.5, 0.1), 0.0, 1.0))
+ 
         p = add_param!(fwm, :e, sym, e_value)
 
         assimilation_efficiencies[intx] = p

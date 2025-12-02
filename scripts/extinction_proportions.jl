@@ -202,12 +202,9 @@ function simulations(;
 
         @info "Assembeling FoodwebModel $fwm_num of $number_of_foodwebs"
 
-        traits, fwm = build_my_fwm(
-            species_richness,
-            connectance,
-            minimum_basal_species,
-            0.2
-        )
+        web = niche_model_min_basal(species_richness, connectance, minimum_basal_species)
+
+        traits, fwm = build_my_fwm(web, 0.2)
         prob = ODEProblem(fwm)
         prob = assemble_foodweb(prob;
             solver = Tsit5(),
@@ -253,8 +250,8 @@ function simulations(;
 end
 
 simulations(
-    species_richness = 20,
-    minimum_basal_species = 5,
+    species_richness = 10,
+    minimum_basal_species = 1,
     number_of_foodwebs = 2,
     number_of_sequences = 5
 )

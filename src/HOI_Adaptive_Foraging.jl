@@ -9,8 +9,11 @@ using DiffEqCallbacks
 using SparseArrays
 using SciMLBase
 
-include("../src/modified_niche_model.jl")
-export modified_niche_model, niche_model_min_basal
+include("../src/niche_model_min_basal.jl")
+export niche_model_min_basal
+
+include("../src/rectangular_web.jl")
+export rectangular_web
 
 include("../src/measures.jl")
 export median_interaction_strength, time_window_population_cv
