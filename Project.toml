@@ -6,6 +6,7 @@ authors = ["Jake Harvey <jacob.harvey@mail.mcgill.ca>"]
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -32,6 +33,7 @@ SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/Spe
 
 [compat]
 CategoricalArrays = "0.10.8"
+Combinatorics = "1.0.2"
 DiffEqCallbacks = "4.4.1"
 FoodwebPlots = "0.1.0"
 GLM = "1.9.0"

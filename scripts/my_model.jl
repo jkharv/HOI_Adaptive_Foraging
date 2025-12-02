@@ -45,12 +45,12 @@ function build_my_fwm(s, c, b, gval)
     traits.mass = map(x -> mass_ratio^x, traits.trophic_level)
 
     # ---------------------------------------------------------------------------- #
-    # Just one global adaptation rate here. Kondoh and Brose already played aroun
+    # Just one global adaptation rate here. Kondoh and Brose already played around
     # with different proportions of adaptive foraging and there was nothing super
     # interesting so there's not point redoing all that here as well.
     # ---------------------------------------------------------------------------- #
 
-    g = add_param!(fwm , :g, gval)
+    g = add_param!(fwm, :g, gval)
 
     # ------------------------------- #
     # Create species-level parameters #

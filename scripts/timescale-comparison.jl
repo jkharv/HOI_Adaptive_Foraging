@@ -9,15 +9,11 @@ include("../scripts/my_model.jl")
 using .HOI_Adaptive_Foraging
 using OrdinaryDiffEqTsit5
 
-using Random
 using LinearAlgebra
 using Statistics
-using Distributions
 using DataFrames
 using StatsBase
-using CSV
-using Dates
-using JLD2
+
 import WGLMakie
 
 function process_solution(sol, g)
