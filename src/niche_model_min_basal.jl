@@ -1,5 +1,5 @@
 # Count the number of basal species in the foodweb.
-function count_basal(web::SpeciesInteractionNetwork)
+function count_basal(web::AnnotatedHypergraph)
 
     count(iszero, (values ∘ generality)(web))
 end

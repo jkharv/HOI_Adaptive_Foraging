@@ -1,11 +1,10 @@
 using WGLMakie
 using DataFrames
 using CSV
-using GLM
 using Statistics
 using CategoricalArrays
 
-df = CSV.read("simulation-output-2025-09-24/data.csv", DataFrame)
+df = CSV.read("sim-output/rectangular-web-2026-01-05/data.csv", DataFrame)
 
 # Extremely low richness is v noisy.
 filter!(:richness_pre => x-> x >= 5, df)

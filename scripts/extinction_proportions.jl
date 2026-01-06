@@ -6,6 +6,7 @@ using OrdinaryDiffEqTsit5
 
 using SpeciesInteractionNetworks
 using HigherOrderFoodwebs
+using AnnotatedHypergraphs
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
@@ -24,6 +25,8 @@ include("my_model.jl")
 OUTPUT_DIR = ""
 
 @info "Dependencies Loaded"
+
+SpeciesInteractionNetworks.CENTRALITY_MAXITER = 200
 
 function simulation_batch(
     traits, 
@@ -125,22 +128,37 @@ function extinction_indices(sol, primary_extinctions)
     return indices
 end
 
+function centrality_of_spp(sol, t, sp)
+
+    net = realized_network(sol, t)
+    cd = centrality(EigenvectorCentrality, net)
+
+    return cd[sp]
+end
+
 function process_solution(sol, g, primary_extinctions, secondary_extinctions)
 
     idxs = extinction_indices(sol, primary_extinctions)
     df = DataFrame()
 
     richness_sol = richness(sol)
+    fwm = sol.prob.f.sys
+    hg = fwm.hg
 
     for (sp, i1, i2) in idxs 
 
         t1 = sol.t[i1]
         t2 = sol.t[i2]
 
+        net = realized_network(sol, t1)
+
         push!(df, (
             retcode = sol.retcode,
             g = g,
             extinction_species = sp,
+            centrality_primary = centrality(EigenvectorCentrality, net)[sp],
+            vulnerability_primary = vulnerability(net, sp),
+            generality_primary = generality(net, sp),
             richness_pre = richness_sol[i1-1],
             richness_post = richness_sol[i2-1],
             secondary_extinctions = count_secondary_extinctions(secondary_extinctions, t1, t2),
@@ -154,7 +172,7 @@ end
 
 function make_output_dir!()
 
-    global OUTPUT_DIR = "simulation-output-" * string(Dates.today())
+    global OUTPUT_DIR = "sim-output/niche-model-" * string(Dates.today())
     mkdir(OUTPUT_DIR)
 
     return
@@ -250,8 +268,32 @@ function simulations(;
 end
 
 simulations(
-    species_richness = 10,
-    minimum_basal_species = 1,
+    species_richness = 20,
+    minimum_basal_species = 3,
     number_of_foodwebs = 2,
     number_of_sequences = 5
 )
+
+import WGLMakie
+
+df = CSV.read("sim-output/niche-model-2025-12-05/data.csv", DataFrame)
+
+# Extremely low richness is v noisy.
+filter!(:richness_pre => x-> x >= 10, df)
+# Some (very few) of the simulation end early because of instability or
+# something. We can just exclude those to be safe. Including them or not didn't
+# change any results. 
+filter!(:retcode => x -> x == "Success", df)
+# Add a column for proportion of community gone extinct after a primary extinction.
+f(x, y) =  y ./ x
+transform!(df, [:richness_pre, :secondary_extinctions] => f => :extinction_proportion)
+
+fig = WGLMakie.Figure()
+ax  = WGLMakie.Axis(fig[1,1])
+WGLMakie.scatter!(ax, 
+    df[:, :vulnerability_primary], 
+    df[:, :extinction_proportion],
+    color = df[:, :g]
+)
+
+names(df)

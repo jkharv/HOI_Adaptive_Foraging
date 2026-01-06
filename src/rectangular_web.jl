@@ -1,7 +1,7 @@
 function rectangular_web(width::Int64, height::Int64)
 
     spp   = Vector{Vector{Symbol}}(undef, height) 
-    intxs = Vector{AnnotatedHyperedge}() 
+    intxs = Vector{AnnotatedHyperedge{Symbol}}() 
 
     spp[1] = [Symbol("sp_1_$(i)") for i in 1:width]
 
@@ -20,5 +20,5 @@ function rectangular_web(width::Int64, height::Int64)
 
     spp = (Unipartite ∘ collect ∘ Iterators.flatten)(spp) 
 
-    return SpeciesInteractionNetwork(spp, intxs)
+    return AnnotatedHypergraph(spp, intxs)
 end

@@ -7,4 +7,4 @@ apptainer/*
 
 *.csv
 figures/*
-simulation-output*
+sim-output*

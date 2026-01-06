@@ -111,7 +111,7 @@ function build_my_fwm(web, gval)
     # Add assimilation efficiencies scaled to niche position. #
     # ------------------------------------------------------- #
 
-    assimilation_efficiencies = Dict{Interaction, Symbol}();
+    assimilation_efficiencies = Dict{AnnotatedHyperedge{Symbol}, Symbol}();
 
     for intx ∈ trophic
 

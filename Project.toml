@@ -4,22 +4,20 @@ version = "0.1.0"
 authors = ["Jake Harvey <jacob.harvey@mail.mcgill.ca>"]
 
 [deps]
+AnnotatedHypergraphs = "121eab65-6eab-4c2f-bb7d-b6867ee8c3ea"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FoodwebPlots = "7dc9db8c-3692-4617-a276-47618cd48976"
-GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 HigherOrderFoodwebs = "573a6084-d739-11ed-30ee-8d814a9e0f06"
-Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultivariateStats = "6f286f6a-111f-5878-ab1e-185364afe411"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
-RDatasets = "ce6b1742-4840-55fa-b093-852dadbb1d8b"
 RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -28,22 +26,22 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [sources]
+AnnotatedHypergraphs = {rev = "main", url = "https://github.com/jkharv/AnnotatedHypergraphs.jl.git"}
 FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl"}
-SpeciesInteractionNetworks = {rev = "main", url = "https://github.com/jkharv/SpeciesInteractionNetworks.jl"}
+HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl.git"}
 
 [compat]
+AnnotatedHypergraphs = "0.1.0"
+CairoMakie = "0.15.7"
 CategoricalArrays = "0.10.8"
 Combinatorics = "1.0.2"
 DiffEqCallbacks = "4.4.1"
 FoodwebPlots = "0.1.0"
-GLM = "1.9.0"
 HigherOrderFoodwebs = "0.1.0"
-Interpolations = "0.15.1"
 JLD2 = "0.6.2"
-KernelDensity = "0.6.9"
 MultivariateStats = "0.10.3"
 OrdinaryDiffEqTsit5 = "1.1.0"
-RDatasets = "0.7.7"
 RuntimeGeneratedFunctions = "0.5.15"
 SparseArrays = "1.11.0"
+SpeciesInteractionNetworks = "0.0.1"
 WGLMakie = "0.13.6"
