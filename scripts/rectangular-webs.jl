@@ -204,13 +204,14 @@ function simulations(;
         g2 = g2,
         time_between_extinctions = time_between_extinctions   
     )
- 
-    webs = [rectangular_web(w, height) for w in width]
-   
-    for (fwm_num, web) in enumerate(webs) 
+
+    @assert length(width) == length(height)    
+
+    for (fwm_num, (w, h)) in enumerate(zip(width, height)) 
 
         @info "Assembeling FoodwebModel $fwm_num"
 
+        web = rectangular_web(w, h, 0.3)
         traits, fwm = build_my_fwm(web, 0.2)
         prob = ODEProblem(fwm)
         prob = assemble_foodweb(prob;
@@ -240,25 +241,27 @@ function simulations(;
             );
 
             data = vcat(sols...)
-            data[!, :foodweb_number] .= fwm_num
+            data[!, :foodweb_number]  .= fwm_num
             data[!, :sequence_number] .= seq_num 
+            data[!, :init_width]  .= w
+            data[!, :init_height] .= h
 
             if (fwm_num == 1) & (seq_num == 1)
-                
+
                 CSV.write(OUTPUT_DIR * "/data.csv", data)
             else
-
+ 
                 CSV.write(OUTPUT_DIR * "/data.csv", data; append = true)
             end
         end
     end
-    
+
     @info "Done!"
 end
 
 simulations(
-    width = (4,4,4),
-    height = 8, 
+    width = (4,4,4,10,10,10),
+    height = (10,10,10,4,4,4), 
     number_of_sequences = 5,
     ntrajectories = 10,
     g1 = 0.0,

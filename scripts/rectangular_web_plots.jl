@@ -4,7 +4,7 @@ using CSV
 using Statistics
 using CategoricalArrays
 
-df = CSV.read("sim-output/rectangular-web-2026-01-05/data.csv", DataFrame)
+df = CSV.read("sim-output/rectangular-web-2026-01-07/data.csv", DataFrame)
 
 # We've already shown there to be only a small effect on small webs. We're not
 # really interested in doing that again with rectangular webs, so we'll limit
@@ -15,9 +15,10 @@ df = CSV.read("sim-output/rectangular-web-2026-01-05/data.csv", DataFrame)
 # analyses we're doing here by including small web trials, which would have
 # become quite un-rectangular.
 filter!(:richness_pre => x-> x >= 15, df)
-# Some (none in most runs) of the simulations end early because of instability or
-# something. We can just exclude those to be safe. Including them or not didn't
-# change any results. 
+
+# Some (none in most runs) of the simulations end early because of instability
+# or something. We can just exclude those to be safe. Including them or not
+# didn't change any results. 
 filter!(:retcode => x -> x == "Success", df)
 
 # Add a column for proportion of community gone extinct after a primary
@@ -27,8 +28,18 @@ filter!(:retcode => x -> x == "Success", df)
 # qualitatively the same results.
 transform!(df, 
     [:richness_pre, :secondary_extinctions] => 
-    (x, y) =  y ./ x 
+    ((x, y) ->  y ./ x) 
     => :extinction_proportion
+)
+
+# Divide our dataset by treatment.
+# TODO: foodweb_number > 3 is not an appropriate way of doing this
+# because it'll change when I change the simulation parameters. I 
+# need to add a column in the simulation out put for wide / tall.
+transform!(df,
+    :init_width =>
+    ByRow((x -> (x==4) ? :tall : :wide ))
+    => :wide_tall
 )
 
 # A bunch of our analyses are on the cascade size distribution, so we're not
@@ -40,20 +51,21 @@ df_no_zero = filter(:secondary_extinctions => !iszero, df)
 # Probability of at least one secondary extinction occuring versus the rate of
 # adaptive foraging.
 #
-# Panel 2
-# Expected cascade size (when they do occur) given as a proportion of the community
-# that goes extinct.
+# Panel 2 
+# Expected cascade size (when they do occur) given as a proportion of the
+# community that goes extinct.
 # ----------------------------------------------------------------------------
 
 # Probability of at least one extinction occuring
-gd = groupby(df, :g)
-f(x) = count(!iszero, x) / length(x)
+gd = groupby(df, [:wide_tall, :g])
 p_extinction = combine(gd, 
-    :extinction_proportion => f => :prob_extinction
+    :extinction_proportion =>
+    (x -> count(!iszero, x) / length(x))
+    => :prob_extinction
 )
 
 # Expected number of secondary extinctions given that at least one occurs.
-gd_no_zero = groupby(df_no_zero, :g)
+gd_no_zero = groupby(df_no_zero, [:wide_tall, :g])
 expected_cascade_size = combine(gd_no_zero, 
     :extinction_proportion => mean => :expected_cascade_size
 )
@@ -67,9 +79,14 @@ panel1 = Axis(fig[1,1],
     xtickformat = "{:.2f}"
 )
 lines!(panel1, 
-    p_extinction[:, :g], 
-    p_extinction[:, :prob_extinction],
+    p_extinction[p_extinction.wide_tall .== :wide, :g], 
+    p_extinction[p_extinction.wide_tall .== :wide, :prob_extinction],
     color = :black
+)
+lines!(panel1, 
+    p_extinction[p_extinction.wide_tall .== :tall, :g], 
+    p_extinction[p_extinction.wide_tall .== :tall, :prob_extinction],
+    color = :red
 )
 
 panel2 = Axis(fig[1,2], 
@@ -82,10 +99,13 @@ panel2 = Axis(fig[1,2],
 sort!(expected_cascade_size, :g)
 empty!(panel2)
 lines!(panel2, 
-    expected_cascade_size[:, :g], 
-    expected_cascade_size[:, :expected_cascade_size],
+    expected_cascade_size[expected_cascade_size.wide_tall .== :wide, :g], 
+    expected_cascade_size[expected_cascade_size.wide_tall .== :wide, :expected_cascade_size],
     color = :black
 )
-
+lines!(panel2, 
+    expected_cascade_size[expected_cascade_size.wide_tall .== :tall, :g], 
+    expected_cascade_size[expected_cascade_size.wide_tall .== :tall, :expected_cascade_size],
+    color = :red
+)
 save("figures/rectangular_web_prob_expected_proportion_g.png", fig)
-

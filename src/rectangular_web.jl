@@ -1,4 +1,4 @@
-function rectangular_web(width::Int64, height::Int64)
+function rectangular_web(width::Int64, height::Int64, connectance)
 
     spp   = Vector{Vector{Symbol}}(undef, height) 
     intxs = Vector{AnnotatedHyperedge{Symbol}}() 
@@ -13,8 +13,11 @@ function rectangular_web(width::Int64, height::Int64)
 
         for (r, p) in pairs 
 
-            i = AnnotatedHyperedge([r, p], [:object, :subject])            
-            push!(intxs, i)
+            if rand() < connectance            
+
+                i = AnnotatedHyperedge([r, p], [:object, :subject])            
+                push!(intxs, i)
+            end
         end
     end
 
