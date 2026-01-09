@@ -26,8 +26,6 @@ OUTPUT_DIR = ""
 
 @info "Dependencies Loaded"
 
-SpeciesInteractionNetworks.CENTRALITY_MAXITER = 200
-
 function simulation_batch(
     traits, 
     fwm, 
@@ -105,6 +103,20 @@ function count_secondary_extinctions(secondary_extinctions, t1, t2)
     return count(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
 end
 
+function cascade_timespan(secondary_extinctions, t1, t2)
+
+    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+    times = first.(cascade)
+
+    if isempty(times)
+
+        return NaN
+    end
+
+    return maximum(times) - minimum(times)
+end
+
+
 function extinction_indices(sol, primary_extinctions)
 
     indices = Vector{Tuple{Symbol, Int64, Int64}}()
@@ -156,12 +168,13 @@ function process_solution(sol, g, primary_extinctions, secondary_extinctions)
             retcode = sol.retcode,
             g = g,
             extinction_species = sp,
-            centrality_primary = centrality(EigenvectorCentrality, net)[sp],
+            # centrality_primary = centrality(EigenvectorCentrality, net)[sp],
             vulnerability_primary = vulnerability(net, sp),
             generality_primary = generality(net, sp),
             richness_pre = richness_sol[i1-1],
             richness_post = richness_sol[i2-1],
             secondary_extinctions = count_secondary_extinctions(secondary_extinctions, t1, t2),
+            timespan_of_cascade = cascade_timespan(secondary_extinctions, t1, t2),
             t1 = sol.t[i1],
             t2 = sol.t[i2],
         ))
@@ -273,27 +286,3 @@ simulations(
     number_of_foodwebs = 2,
     number_of_sequences = 5
 )
-
-import WGLMakie
-
-df = CSV.read("sim-output/niche-model-2025-12-05/data.csv", DataFrame)
-
-# Extremely low richness is v noisy.
-filter!(:richness_pre => x-> x >= 10, df)
-# Some (very few) of the simulation end early because of instability or
-# something. We can just exclude those to be safe. Including them or not didn't
-# change any results. 
-filter!(:retcode => x -> x == "Success", df)
-# Add a column for proportion of community gone extinct after a primary extinction.
-f(x, y) =  y ./ x
-transform!(df, [:richness_pre, :secondary_extinctions] => f => :extinction_proportion)
-
-fig = WGLMakie.Figure()
-ax  = WGLMakie.Axis(fig[1,1])
-WGLMakie.scatter!(ax, 
-    df[:, :vulnerability_primary], 
-    df[:, :extinction_proportion],
-    color = df[:, :g]
-)
-
-names(df)

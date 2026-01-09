@@ -38,7 +38,7 @@ transform!(df,
 # need to add a column in the simulation out put for wide / tall.
 transform!(df,
     :init_width =>
-    ByRow((x -> (x==4) ? :tall : :wide ))
+    ByRow((x -> (x==5) ? :tall : :wide ))
     => :wide_tall
 )
 
