@@ -29,19 +29,3 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 AnnotatedHypergraphs = {rev = "main", url = "https://github.com/jkharv/AnnotatedHypergraphs.jl.git"}
 FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl"}
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl.git"}
-
-[compat]
-AnnotatedHypergraphs = "0.1.0"
-CairoMakie = "0.15.7"
-CategoricalArrays = "0.10.8"
-Combinatorics = "1.0.2"
-DiffEqCallbacks = "4.4.1"
-FoodwebPlots = "0.1.0"
-HigherOrderFoodwebs = "0.1.0"
-JLD2 = "0.6.2"
-MultivariateStats = "0.10.3"
-OrdinaryDiffEqTsit5 = "1.1.0"
-RuntimeGeneratedFunctions = "0.5.15"
-SparseArrays = "1.11.0"
-SpeciesInteractionNetworks = "0.0.1"
-WGLMakie = "0.13.6"
