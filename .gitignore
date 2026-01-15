@@ -1,5 +1,7 @@
 Manifest.toml
 
-output/*
 figures/*
 sim-output/*
+
+# We wanna keep the above directories themselves, but not the contents.
+!.gitkeep
