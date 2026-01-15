@@ -14,12 +14,11 @@ the probabilty and size of extinction cascades in foodwebs.
     containned. 
 
 `scripts/simulation-scripts` :
-    Scripts in the `simulation-scripts` subdirectory are potentially very long
-    running and are intended to be run as batch jobs on a HPC cluster.
+    Define simulations to be run, potentially very long running and are intended
+    to be run as batch jobs on a HPC cluster.
 
 `scripts/simulation-scripts` :
-    Scripts in the `analysis-scripts` subdirectory are used to analyze/plot the
-    results of simulations.
+    Scripts used to analyze/plot the results of simulations.
 
 `sim-output/` :
     Top-level directory for storing data output from simulations. Each run
