@@ -22,7 +22,7 @@ function holling_disk(B_focal, a_focal, B_all, a_all, b0)
     return (B_focal * a_focal) / (b0 + (a_all ⋅ B_all))
 end
 
-function build_my_fwm(web, gval)
+function build_fwm(web, gval)
 
     fwm = (FoodwebModel ∘ optimal_foraging)(web) 
 

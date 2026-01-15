@@ -1,10 +1,5 @@
 Manifest.toml
-.vscode/settings.json
-output/*
-data.csv
-apptainer/*
-*.png
 
-*.csv
+output/*
 figures/*
-sim-output*
+sim-output/*

@@ -81,6 +81,23 @@ function is_trait_variable(fwm, v)
     return false
 end
 
+"""
+    AlphaManifoldCallbackAffect
+
+This is a callback to be used with the ODE Solver. It ensures that for each
+consumer, the sum of all their alpha values remains one (or close to it). 
+
+That is, the points are confined to a manifold defined by ∑α = 1.
+
+This wouldn't of been needed in the original Kondoh model because of the use of
+type I responses. The system would naturally maintain the constraint through
+integration (maybe not though because of floating point error???). Brose's
+addition of type II responses made this non-linear, which won't naturally
+maintain the constraint.
+
+There's probably a more "elegant" (mathematical rather than numerical) way of
+fixing this, but I'm no mathematician so I have no idea how. This works.
+"""
 function AlphaManifoldCallback(fwm::FoodwebModel)
 
     amca = AlphaManifoldCallbackAffect(fwm)

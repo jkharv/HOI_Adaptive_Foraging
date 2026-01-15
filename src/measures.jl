@@ -1,8 +1,66 @@
+# This file contains a bunch of functions used for extracting some useful value
+# from ODE solutions. These are mostly used within the `process_solution`
+# function when we set up `EnsembleProblem`. It takes a lot of space to store 
+# entire solution for so many runs, so the output of these functions is all we
+# store of a simulation.
+#
+# See the corresponding file in ./scripts to find which measures are recorded in
+# which simulations.
+
+"""
+    count_secondary_extinctions(
+        secondary_extinctions::Vector{Tuple{Float64, Symbol}},
+        t1::Float64, t2::Float64
+    )
+
+Count the number of secondary extinctions between timepoints t1 and t2.
+"""
+function count_secondary_extinctions(secondary_extinctions, t1, t2)
+
+    return count(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+end
+
+"""
+    cascade_timespan(
+    secondary_extinctions::Vector{Tuple{Float64, Symbol}},
+    t1::Float64, t2::Float64)
+
+Returns the timespan of the extinction cascade taking place between times t1 and
+t2. This will produce NaN if there wasn't a cascade. 
+"""
+function cascade_timespan(secondary_extinctions, t1, t2)
+
+    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+    times = first.(cascade)
+
+    if isempty(times)
+
+        return NaN
+    end
+
+    return maximum(times) - minimum(times)
+end
+
+"""
+    eigencentrality_of_spp(sol, t, sp)
+
+Returns the (realized) eigencentrality of a species at time t. Eigencentrality
+was the only centrality measure that would work on raw biomass flux values,
+which is good; but it seems pretty poorly behaved in our models, which is bad. 
+"""
+function eigencentrality_of_spp(sol, t, sp)
+
+    net = realized_network(sol, t)
+    cd = centrality(EigenvectorCentrality, net)
+
+    return cd[sp]
+end
+
 """
     median_interaction_strength(sol)
 
 Calculates the median interaction over time in the community.
-
+sol.prob.f.sys
 Interaction strength, here, is measured as preference parameters (α) of a
 consumer species on it's resources.
 """
@@ -168,6 +226,11 @@ function eigenstability(sol; species_only = true, sparseness = 1)
     return (out, missing_points) 
 end
 
+"""
+    richness(sol)
+
+Returns a timeseries of species richness over time from an `ODESolution`
+"""
 function HigherOrderFoodwebs.richness(sol)
 
     out = Vector{Int64}()
@@ -188,11 +251,12 @@ end
 # Utility functions #
 # ----------------- #
 
-# TODO Add check that these actually exist. The sol isn't guaranteed to be
-# coming from HigherOrderFoodwebs
 function get_foodwebmodel(sol)
 
-    return sol.prob.f.sys
+    fwm = sol.prob.f.sys
+    @assert fwm isa FoodwebModel
+
+    return fwm
 end
 
 function get_jacobian(sol)

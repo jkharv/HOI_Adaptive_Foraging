@@ -11,6 +11,7 @@ using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 using Random
+using Dates
 using LinearAlgebra
 using Statistics
 using Distributions
@@ -98,25 +99,6 @@ function index_of_time(sol, t)
     return findfirst(x -> x == t, sol.t)
 end
 
-function count_secondary_extinctions(secondary_extinctions, t1, t2)
-
-    return count(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
-end
-
-function cascade_timespan(secondary_extinctions, t1, t2)
-
-    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
-    times = first.(cascade)
-
-    if isempty(times)
-
-        return NaN
-    end
-
-    return maximum(times) - minimum(times)
-end
-
-
 function extinction_indices(sol, primary_extinctions)
 
     indices = Vector{Tuple{Symbol, Int64, Int64}}()
@@ -140,41 +122,26 @@ function extinction_indices(sol, primary_extinctions)
     return indices
 end
 
-function centrality_of_spp(sol, t, sp)
-
-    net = realized_network(sol, t)
-    cd = centrality(EigenvectorCentrality, net)
-
-    return cd[sp]
-end
-
 function process_solution(sol, g, primary_extinctions, secondary_extinctions)
 
     idxs = extinction_indices(sol, primary_extinctions)
     df = DataFrame()
 
     richness_sol = richness(sol)
-    fwm = sol.prob.f.sys
-    hg = fwm.hg
 
     for (sp, i1, i2) in idxs 
 
         t1 = sol.t[i1]
         t2 = sol.t[i2]
 
-        net = realized_network(sol, t1)
-
         push!(df, (
             retcode = sol.retcode,
             g = g,
             extinction_species = sp,
-            # centrality_primary = centrality(EigenvectorCentrality, net)[sp],
-            vulnerability_primary = vulnerability(net, sp),
-            generality_primary = generality(net, sp),
+            # centrality_primary = centrality_of_spp(sol, t1-1.0, sp),
             richness_pre = richness_sol[i1-1],
             richness_post = richness_sol[i2-1],
             secondary_extinctions = count_secondary_extinctions(secondary_extinctions, t1, t2),
-            timespan_of_cascade = cascade_timespan(secondary_extinctions, t1, t2),
             t1 = sol.t[i1],
             t2 = sol.t[i2],
         ))
@@ -185,7 +152,7 @@ end
 
 function make_output_dir!()
 
-    global OUTPUT_DIR = "sim-output/niche-model-" * string(Dates.today())
+    global OUTPUT_DIR = "sim-output/rectangular-web-" * string(Dates.today())
     mkdir(OUTPUT_DIR)
 
     return
@@ -204,10 +171,8 @@ function save_parameters!(; kwargs...)
 end
 
 function simulations(;
-    species_richness = 20,
-    connectance = 0.3,
-    minimum_basal_species = 5,
-    number_of_foodwebs  = 5,
+    width = 1:5,
+    height = 10,
     number_of_sequences = 10,
     ntrajectories = 10,
     g1 = 0.0,
@@ -218,24 +183,23 @@ function simulations(;
     make_output_dir!()
 
     save_parameters!(
-        species_richness = species_richness,
-        connectance = connectance,
-        minimum_basal_species = minimum_basal_species,
-        number_of_foodwebs = number_of_foodwebs,
+        width = width,
+        height = height,
         number_of_sequences = number_of_sequences,
         ntrajectories = ntrajectories,   
         g1 = g1,
         g2 = g2,
         time_between_extinctions = time_between_extinctions   
     )
- 
-    for fwm_num in 1:number_of_foodwebs
 
-        @info "Assembeling FoodwebModel $fwm_num of $number_of_foodwebs"
+    @assert length(width) == length(height)    
 
-        web = niche_model_min_basal(species_richness, connectance, minimum_basal_species)
+    for (fwm_num, (w, h)) in enumerate(zip(width, height)) 
 
-        traits, fwm = build_my_fwm(web, 0.2)
+        @info "Assembeling FoodwebModel $fwm_num"
+
+        web = rectangular_web(w, h, 0.3)
+        traits, fwm = build_fwm(web, 0.2)
         prob = ODEProblem(fwm)
         prob = assemble_foodweb(prob;
             solver = Tsit5(),
@@ -264,25 +228,30 @@ function simulations(;
             );
 
             data = vcat(sols...)
-            data[!, :foodweb_number] .= fwm_num
+            data[!, :foodweb_number]  .= fwm_num
             data[!, :sequence_number] .= seq_num 
+            data[!, :init_width]  .= w
+            data[!, :init_height] .= h
 
             if (fwm_num == 1) & (seq_num == 1)
-                
+
                 CSV.write(OUTPUT_DIR * "/data.csv", data)
             else
-
+ 
                 CSV.write(OUTPUT_DIR * "/data.csv", data; append = true)
             end
         end
     end
-    
+
     @info "Done!"
 end
 
 simulations(
-    species_richness = 20,
-    minimum_basal_species = 3,
-    number_of_foodwebs = 2,
-    number_of_sequences = 5
+    width = (4,4,4,10,10,10),
+    height = (10,10,10,4,4,4), 
+    number_of_sequences = 5,
+    ntrajectories = 10,
+    g1 = 0.0,
+    g2 = 0.5,
+    time_between_extinctions = 1_000.0,
 )

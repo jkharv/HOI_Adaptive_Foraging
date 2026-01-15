@@ -4,7 +4,7 @@ function count_basal(web::AnnotatedHypergraph)
     count(iszero, (values ∘ generality)(web))
 end
 
-# Niche model with a minimum guaranteed number of basal species
+# Niche model with a minimum guaranteed number of basal species.
 function niche_model_min_basal(s, c, b)
 
     for i ∈ 1:100
