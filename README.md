@@ -6,7 +6,7 @@ the probabilty and size of extinction cascades in foodwebs.
 # Directory Structure / Organization
 
 `src/` :
-    Implementation of things needed performing the simulations and analyses. Not
+    Implementation of things needed to perform the simulations and analyses. Not
     upstreamed because they're specific to this research project.
 
 `scripts/` :
@@ -14,12 +14,10 @@ the probabilty and size of extinction cascades in foodwebs.
     containned. 
 
 `scripts/simulation-scripts` :
-
     Scripts in the `simulation-scripts` subdirectory are potentially very long
     running and are intended to be run as batch jobs on a HPC cluster.
 
 `scripts/simulation-scripts` :
-
     Scripts in the `analysis-scripts` subdirectory are used to analyze/plot the
     results of simulations.
 
