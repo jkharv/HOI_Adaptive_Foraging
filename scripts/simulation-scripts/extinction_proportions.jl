@@ -1,4 +1,4 @@
-include("../src/HOI_Adaptive_Foraging.jl")
+include("../../src/HOI_Adaptive_Foraging.jl")
 
 using .HOI_Adaptive_Foraging
 
@@ -7,8 +7,6 @@ using OrdinaryDiffEqTsit5
 using SpeciesInteractionNetworks
 using HigherOrderFoodwebs
 using AnnotatedHypergraphs
-using RuntimeGeneratedFunctions
-RuntimeGeneratedFunctions.init(@__MODULE__)
 
 using Random
 using LinearAlgebra
@@ -19,14 +17,15 @@ using StatsBase
 using CSV
 using JLD2
 
-include("my_model.jl")
-
 @info "Dependencies Loaded"
+
+global_temp = nothing
 
 function process_solution(sol, g, primary_extinctions, secondary_extinctions)
 
     idxs = extinction_indices(sol, primary_extinctions)
     df = DataFrame()
+    allowmissing!(df)
 
     richness_sol = richness(sol)
     fwm = sol.prob.f.sys
@@ -39,6 +38,12 @@ function process_solution(sol, g, primary_extinctions, secondary_extinctions)
 
         net = realized_network(sol, t1)
 
+        if (length ∘ interactions)(net) > 20
+            global global_temp = net
+        end
+
+        trial = secondary_extinctions_during_trial(secondary_extinctions, t1, t2)
+
         push!(df, (
             retcode = sol.retcode,
             g = g,
@@ -47,10 +52,12 @@ function process_solution(sol, g, primary_extinctions, secondary_extinctions)
             generality_primary = generality(net, sp),
             richness_pre = richness_sol[i1-1],
             richness_post = richness_sol[i2-1],
-            secondary_extinctions = count_secondary_extinctions(secondary_extinctions, t1, t2),
+            secondary_extinctions = length(trial),
             timespan_of_cascade = cascade_timespan(secondary_extinctions, t1, t2),
-            t1 = sol.t[i1],
-            t2 = sol.t[i2]
+            avg_extinction_time = mean_extinction_time(secondary_extinctions, t1, t2),
+            trophic_range = cascade_trophic_range(net, last.(trial)),
+            t1 = t1,
+            t2 = t2 
         )
         )
     end
@@ -67,10 +74,11 @@ function simulations(;
     ntrajectories = 10,
     g1 = 0.0,
     g2 = 0.5,
-    time_between_extinctions = 1_000.0
+    time_between_extinctions = 1_000.0,
+    stem = "niche-model"
     )
 
-    output_dir = make_output_dir!("niche-model")
+    output_dir = make_output_dir!(stem)
 
     save_parameters!(output_dir;
         species_richness = species_richness,
@@ -136,8 +144,9 @@ function simulations(;
 end
 
 simulations(
-    species_richness = 10,
-    minimum_basal_species = 1,
+    species_richness = 20,
+    minimum_basal_species = 3,
     number_of_foodwebs = 2,
-    number_of_sequences = 2
+    number_of_sequences = 2,
+    stem = "test",
 )
