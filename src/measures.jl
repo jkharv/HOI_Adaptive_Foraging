@@ -8,16 +8,29 @@
 # which simulations.
 
 """
-    count_secondary_extinctions(
-        secondary_extinctions::Vector{Tuple{Float64, Symbol}},
-        t1::Float64, t2::Float64
-    )
+    cascade_trophic_range(web, extinctions::Vector{Symbol})
 
-Count the number of secondary extinctions between timepoints t1 and t2.
+Returns Δ trophic level of the species involved in a trophic cascade.
+Returns zero if there was no cascade (or a single species).
 """
-function count_secondary_extinctions(secondary_extinctions, t1, t2)
+function cascade_trophic_range(web, extinctions::Vector{Symbol})::Float64
 
-    return count(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+    if length(extinctions) < 2
+        return 0.0 
+    end
+
+    # SpeciesInteractionNetworks.jl treats Quantitative networks in pathfinding
+    # in a way that produces insane trophic levels. Distance of an interactions
+    # is taken to be the inverse of the weight. Thus when the weights are
+    # potentially small numbers 1 >>, you can get crazy things happening, like
+    # everyone has a nice and reasonable trophic level, and them BAM! One
+    # species is at trophic level 305. The package docs suggest using
+    # `normalize` on the networks, but I've found that's not sufficient.  I
+    # added the function `rescale_network` to HigherOrderFoodwebs.jl to deal
+    # with this, but I'm not super happy about it in general. 
+
+    tls = distancetobase.((Ref ∘ rescale_network)(web), extinctions, mean)
+    return maximum(tls) - minimum(tls)
 end
 
 """
@@ -28,32 +41,30 @@ end
 Returns the timespan of the extinction cascade taking place between times t1 and
 t2. This will produce NaN if there wasn't a cascade. 
 """
-function cascade_timespan(secondary_extinctions, t1, t2)
+function cascade_timespan(secondary_extinctions, t1, t2)::Float64
 
     cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
     times = first.(cascade)
 
     if isempty(times)
 
-        return NaN
+        return 0 
     end
 
     return maximum(times) - minimum(times)
 end
 
-"""
-    eigencentrality_of_spp(sol, t, sp)
+function mean_extinction_time(secondary_extinctions, t1, t2)::Float64
 
-Returns the (realized) eigencentrality of a species at time t. Eigencentrality
-was the only centrality measure that would work on raw biomass flux values,
-which is good; but it seems pretty poorly behaved in our models, which is bad. 
-"""
-function eigencentrality_of_spp(sol, t, sp)
+    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+    times = first.(cascade)
 
-    net = realized_network(sol, t)
-    cd = centrality(EigenvectorCentrality, net)
+    if isempty(times)
 
-    return cd[sp]
+        return 0 
+    end
+
+    return mean(times .- minimum(times))
 end
 
 """
@@ -64,7 +75,7 @@ sol.prob.f.sys
 Interaction strength, here, is measured as preference parameters (α) of a
 consumer species on it's resources.
 """
-function median_interaction_strength(sol, sp)
+function median_interaction_strength(sol, sp)::Float64
 
     fwm = sol.prob.f.sys
 
@@ -100,7 +111,7 @@ function median_interaction_strength(sol, sp)
     return median_alpha
 end
 
-function median_interaction_strength(sol)
+function median_interaction_strength(sol)::Float64
 
     fwm = sol.prob.f.sys
     out = Vector{Float64}(undef, length(sol.t))
@@ -124,7 +135,7 @@ only the species with non-zero mean population over the time window.
 """
 function time_window_population_cv(sol, window_size; 
     step_size = 0.1, window_alignment = :CENTRE
-)
+)::Float64
 
     fwm = sol.prob.f.sys
     spp = variables(fwm, type = SPECIES_VARIABLE)
@@ -153,7 +164,7 @@ end
 Calculate a time series of coefficient of variation of total community biomass
 accross a rolling window of size `window_size`.
 """
-function time_window_community_cv(sol, window_size; window_alignment = :CENTRE)
+function time_window_community_cv(sol, window_size; window_alignment = :CENTRE)::Float64
 
     fwm = sol.prob.f.sys
     spp = variables(fwm, type = SPECIES_VARIABLE)
@@ -185,7 +196,7 @@ end
 Calculate the real part of the leading eigenvalue of the jacobian matrix
 at every point t along the time series.
 """
-function eigenstability(sol; species_only = true, sparseness = 1)
+function eigenstability(sol; species_only = true, sparseness = 1)::Float64
 
     error("Broken, Don't use THIS!")    
 
@@ -231,7 +242,7 @@ end
 
 Returns a timeseries of species richness over time from an `ODESolution`
 """
-function HigherOrderFoodwebs.richness(sol)
+function HigherOrderFoodwebs.richness(sol)::Vector{Int64}
 
     out = Vector{Int64}()
     sizehint!(out, length(sol.t))
@@ -250,6 +261,11 @@ end
 # ----------------- #
 # Utility functions #
 # ----------------- #
+
+function secondary_extinctions_during_trial(secondary_extinctions, t1, t2)
+
+    return filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+end
 
 function get_foodwebmodel(sol)
 
