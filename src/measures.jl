@@ -33,6 +33,22 @@ function cascade_trophic_range(web, extinctions::Vector{Symbol})::Float64
     return maximum(tls) - minimum(tls)
 end
 
+function maximum_trophic_level(web)::Float64
+
+    # SpeciesInteractionNetworks.jl treats Quantitative networks in pathfinding
+    # in a way that produces insane trophic levels. Distance of an interactions
+    # is taken to be the inverse of the weight. Thus when the weights are
+    # potentially small numbers 1 >>, you can get crazy things happening, like
+    # everyone has a nice and reasonable trophic level, and them BAM! One
+    # species is at trophic level 305. The package docs suggest using
+    # `normalize` on the networks, but I've found that's not sufficient.  I
+    # added the function `rescale_network` to HigherOrderFoodwebs.jl to deal
+    # with this, but I'm not super happy about it in general. 
+
+    tls = distancetobase.((Ref ∘ rescale_network)(web), species(web), mean)
+    return maximum(tls) 
+end
+
 """
     cascade_timespan(
     secondary_extinctions::Vector{Tuple{Float64, Symbol}},

@@ -31,7 +31,7 @@ export median_interaction_strength, time_window_population_cv
 export eigenstability, time_window_community_cv, richness
 export cascade_timespan, eigencentrality_of_spp
 export cascade_trophic_range, secondary_extinctions_during_trial
-export mean_extinction_time
+export mean_extinction_time, maximum_trophic_level
 
 include("../src/simulation_tools.jl")
 export make_output_dir!, save_parameters!, simulation_batch, extinction_indices
