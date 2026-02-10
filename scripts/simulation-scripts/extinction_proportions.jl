@@ -56,6 +56,7 @@ function process_solution(sol, g, primary_extinctions, secondary_extinctions)
             timespan_of_cascade = cascade_timespan(secondary_extinctions, t1, t2),
             avg_extinction_time = mean_extinction_time(secondary_extinctions, t1, t2),
             trophic_range = cascade_trophic_range(net, last.(trial)),
+            maximum_trophic_level = maximum_trophic_level(net),
             t1 = t1,
             t2 = t2 
         )
@@ -144,8 +145,8 @@ function simulations(;
 end
 
 simulations(
-    species_richness = 20,
-    minimum_basal_species = 3,
+    species_richness = 10,
+    minimum_basal_species = 1,
     number_of_foodwebs = 2,
     number_of_sequences = 2,
     stem = "test",
