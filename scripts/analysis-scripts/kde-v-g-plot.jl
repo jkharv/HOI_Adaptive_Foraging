@@ -1,4 +1,4 @@
-using WGLMakie
+using CairoMakie
 using DataFrames
 using CSV
 using Statistics
@@ -14,11 +14,9 @@ transform!(df,
     ((x, y) ->  y ./ x)
     => :extinction_proportion
 )
-
 filter!(:extinction_proportion => (x-> x>0), df)
 
-
-# Hist plots
+# Density (KDE) plots
 fig = Figure(size = (750, 500))
 ax  = Axis(fig[1,1], xlabel = "log(Cascade Size)", ylabel = "count")
 for (i, g) in (enumerate ∘ groupby)(df, :g)
@@ -31,40 +29,18 @@ for (i, g) in (enumerate ∘ groupby)(df, :g)
         
     )
 end
-save("./figures/kde-v-g.png", fig)
+save("./figures/kde-v-g.svg", fig)
 
-
+# Fit exp scale parameter for each g value.
 param = []
-# Plots of exponential distribution fit to data.
-fig = Figure(size = (750, 500))
-ax  = Axis(fig[1,1], xlabel = "Cascade Size", ylabel = "count")
-xlims!(0, 0.5)
 for (i, g) in (enumerate ∘ groupby)(df, :g)
-    
     x = fit(Exponential, g[:, :extinction_proportion])
     append!(param, params(x))
-    band!(ax, 0:0.001:1.0, 
-        pdf.(Ref(x), 0:0.001:1.0) .+ 4i,
-        4i;
-        color = (:slategray, 0.4)
-    )
 end
-
-# Exp fit on log scale
-fig = Figure(size = (750, 500))
-ax  = Axis(fig[1,1], xlabel = "Cascade Size", ylabel = "log(count)")
-xlims!(0, 0.5)
-for (i, g) in (enumerate ∘ groupby)(df, :g)
     
-    x = fit(Exponential, g[:, :extinction_proportion])
-    append!(param, params(x))
-    lines!(ax, 0:0.001:1.0, 
-        (log ∘ pdf).(Ref(x), 0:0.001:1.0), 
-    )
-end
-save("./log-exp-fit-v-g.png", fig)
-
-
-empty!(ax)
-g_vals = unique(df[:, :g])
-lines!(ax, g_vals, param)
+# Rate parameter v g
+fig = Figure(size = (750, 500))
+ax  = Axis(fig[1,1], xlabel = "g", ylabel = "Exponential Scale Parameter")
+gs = unique(df[:, :g])
+lines!(ax, gs, param)
+save("./figures/exp-scale-v-g.svg", fig)
