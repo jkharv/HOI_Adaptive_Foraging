@@ -16,6 +16,7 @@ using DataFrames
 using StatsBase
 using CSV
 using JLD2
+using UUIDs
 
 @info "Dependencies Loaded"
 
@@ -53,14 +54,16 @@ function process_solution(
         # can study it in more depth later.
         # All of the large ones. And a small random chance of saving not-large
         # ones so that we have smaller cascades for comparison.
+        realized_web_path = "NA"
         if ((richness_sol[i1-1] - richness_sol[i2-1]) > LARGE_CASCADE_CUTOFF) | (rand() < SAVE_PROBABILITY)
 
             mkpath(output_dir * "/realized_webs")
-            jldsave(
-                    output_dir *
-                    "/realized_webs/foodweb_fw$(foodweb_number)_seq$(sequence_number)_sp$(sp).jld2",
+
+            realized_web_path = output_dir * "/realized_webs/" * (string ∘ uuid4)() * ".jld2" 
+            jldsave(realized_web_path,
                     true; 
-                    fwm = fwm,
+                    net = net,
+                    g = g,
                     u_pre = sol[i1-1],
                     extinction_target = sp
             )
@@ -72,6 +75,7 @@ function process_solution(
             retcode = sol.retcode,
             g = g,
             extinction_target = sp, 
+            realized_web = realized_web_path,
             vulnerability_target = vulnerability(net, sp),
             generality_target = generality(net, sp),
             richness_pre = richness_sol[i1-1],
