@@ -280,7 +280,19 @@ end
 
 function secondary_extinctions_during_trial(secondary_extinctions, t1, t2)
 
-    return filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+
+    if isempty(cascade)
+
+        return typeof(cascade)() 
+    end
+
+    for (i, extinction) in enumerate(cascade)
+
+        cascade[i] = (extinction[1] - t1, extinction[2])
+    end
+
+    return cascade
 end
 
 function get_foodwebmodel(sol)

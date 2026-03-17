@@ -20,8 +20,7 @@ using UUIDs
 
 @info "Dependencies Loaded"
 
-# probably 4-5 in practice
-const LARGE_CASCADE_CUTOFF = 2
+const LARGE_CASCADE_CUTOFF = 1
 const SAVE_PROBABILITY = 0.01
 
 function process_solution(
@@ -39,9 +38,8 @@ function process_solution(
     allowmissing!(df)
 
     richness_sol = richness(sol)
-    fwm = sol.prob.f.sys
 
-    # Run for each cascade in the run.
+    # Run for each cascade in series.
     for (sp, i1, i2) in idxs
 
         t1 = sol.t[i1]
@@ -60,12 +58,9 @@ function process_solution(
             mkpath(output_dir * "/realized_webs")
 
             realized_web_path = output_dir * "/realized_webs/" * (string ∘ uuid4)() * ".jld2" 
-            jldsave(realized_web_path,
-                    true; 
+            jldsave(realized_web_path, true; 
                     net = net,
-                    g = g,
                     u_pre = sol[i1-1],
-                    extinction_target = sp
             )
         end
 
@@ -74,15 +69,11 @@ function process_solution(
             sequence_number = sequence_number,
             retcode = sol.retcode,
             g = g,
-            extinction_target = sp, 
+            target_species = sp, 
+            cascade = trial,
             realized_web = realized_web_path,
-            vulnerability_target = vulnerability(net, sp),
-            generality_target = generality(net, sp),
             richness_pre = richness_sol[i1-1],
             richness_post = richness_sol[i2-1],
-            secondary_extinctions = length(trial),
-            cascade_timespan = cascade_timespan(secondary_extinctions, t1, t2),
-            avg_extinction_time = mean_extinction_time(secondary_extinctions, t1, t2),
             cascade_trophic_range = cascade_trophic_range(net, last.(trial)),
             maximum_trophic_level = maximum_trophic_level(net),
             t1 = t1,
