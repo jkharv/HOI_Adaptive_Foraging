@@ -29,11 +29,5 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [sources]
 AnnotatedHypergraphs = {rev = "main", url = "https://github.com/jkharv/AnnotatedHypergraphs.jl.git"}
-FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl"}
+FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl.git"}
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl.git"}
-
-[compat]
-Dates = "1.11.0"
-GLM = "1.9.3"
-OrdinaryDiffEqTsit5 = "1.7.0"
-QuantileRegressions = "0.1.11"
