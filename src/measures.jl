@@ -50,16 +50,12 @@ function maximum_trophic_level(web)::Float64
 end
 
 """
-    cascade_timespan(
-    secondary_extinctions::Vector{Tuple{Float64, Symbol}},
-    t1::Float64, t2::Float64)
+    cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})
 
-Returns the timespan of the extinction cascade taking place between times t1 and
-t2. This will produce NaN if there wasn't a cascade. 
+Returns the total timespan of an extinction cascade.
 """
-function cascade_timespan(secondary_extinctions, t1, t2)::Float64
+function cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})::Float64
 
-    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
     times = first.(cascade)
 
     if isempty(times)
@@ -70,9 +66,13 @@ function cascade_timespan(secondary_extinctions, t1, t2)::Float64
     return maximum(times) - minimum(times)
 end
 
-function mean_extinction_time(secondary_extinctions, t1, t2)::Float64
+"""
+    cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})
 
-    cascade = filter(t -> (t[1] > t1) & (t[1] < t2), secondary_extinctions)
+Returns the mean time to extinction after a primary extinction
+"""
+function mean_extinction_time(cascade::Vector{Tuple{Float64, Symbol}})::Float64
+
     times = first.(cascade)
 
     if isempty(times)
@@ -358,4 +358,33 @@ function maxabs(x::Vector{<:Number})
     end
 
     return max
+end
+
+function neighbouring_species(web, sp, r = 1)::Set{Symbol}
+
+    if r == 1
+
+        return neighbors(web, sp)
+
+    else
+        
+        return union(
+            neighbouring_species.(Ref(web), neighbors(web, sp), Ref(r - 1))...
+        )
+    end
+end
+
+function extract_neighbourhood(web, sp, r = 1)
+
+    spp = (collect ∘ neighbouring_species)(web, sp, r)
+    m   = spzeros(eltype(web.edges), length(spp), length(spp))
+
+    for (i, subj) in enumerate(spp)
+        for (j, obj) in enumerate(spp)
+
+            m[i,j] = web[subj, obj]
+        end
+    end
+
+    return SpeciesInteractionNetwork(Unipartite(spp), typeof(web.edges)(m))
 end

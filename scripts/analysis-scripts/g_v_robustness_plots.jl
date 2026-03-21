@@ -1,20 +1,15 @@
+include("../../src/HOI_Adaptive_Foraging.jl")
+using .HOI_Adaptive_Foraging
+
 using WGLMakie
 using DataFrames
 using CSV
 using Statistics
 using CategoricalArrays
 
-df = CSV.read("sim-output/rectangular-web-2026-01-05/data.csv", DataFrame)
+df = CSV.read("sim-output/rectangular-web-2026-03-16/data.csv", DataFrame)
 
-# Extremely low richness is v noisy.
-filter!(:richness_pre => x-> x >= 5, df)
-# Some (very few) of the simulation end early because of instability or
-# something. We can just exclude those to be safe. Including them or not didn't
-# change any results. 
-filter!(:retcode => x -> x == "Success", df)
-# Add a column for proportion of community gone extinct after a primary extinction.
-f(x, y) =  y ./ x
-transform!(df, [:richness_pre, :secondary_extinctions] => f => :extinction_proportion)
+preprocessing!(df)
 
 # ------------------------------------------------------------------------------
 # Calculating some derived values from the raw extinction trial data. This will

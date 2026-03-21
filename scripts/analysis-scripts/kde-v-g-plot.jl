@@ -1,3 +1,6 @@
+include("../../src/HOI_Adaptive_Foraging.jl")
+using .HOI_Adaptive_Foraging
+
 using CairoMakie
 using DataFrames
 using CSV
@@ -5,16 +8,9 @@ using Statistics
 using CategoricalArrays
 using Distributions
 
-df = CSV.read("sim-output/niche-model-2026-01-12/data.csv", DataFrame)
+df = CSV.read("sim-output/niche-model-2026-03-16/data.csv", DataFrame)
 
-filter!(:richness_pre => x-> x >= 20, df)
-filter!(:retcode => x -> x == "Success", df)
-transform!(df,
-    [:richness_pre, :secondary_extinctions] =>
-    ((x, y) ->  y ./ x)
-    => :extinction_proportion
-)
-filter!(:extinction_proportion => (x-> x>0), df)
+preprocessing!(df)
 
 # Density (KDE) plots
 fig = Figure(size = (750, 500))

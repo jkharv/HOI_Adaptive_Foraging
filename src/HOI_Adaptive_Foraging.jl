@@ -39,4 +39,7 @@ export make_output_dir!, save_parameters!, simulation_batch, extinction_indices
 include("../src/alpha_manifold.jl")
 export AlphaManifoldCallback
 
+include("../src/preprocessing.jl")
+export preprocessing!
+
 end

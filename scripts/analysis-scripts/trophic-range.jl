@@ -1,3 +1,6 @@
+include("../../src/HOI_Adaptive_Foraging.jl")
+using .HOI_Adaptive_Foraging
+
 using WGLMakie
 using DataFrames
 using CSV
@@ -6,40 +9,20 @@ using Statistics
 using CategoricalArrays
 using QuantileRegressions
 
-const RICHNESS_CUTOFF = 5
-
 function boundary(sptl::Float64, s::Float64)::Float64
 
     return s / sptl
 end
 
-df = CSV.read("sim-output/niche-model-2026-02-10/data.csv", DataFrame)
+df = CSV.read("sim-output/niche-model-2026-03-16/data.csv", DataFrame)
 
-filter!(:richness_pre => x-> x >= RICHNESS_CUTOFF, df)
-
-# Some (none in most runs) of the simulations end early because of instability
-# or something. We can just exclude those to be safe. Including them or not
-# didn't change any results. 
-filter!(:retcode => x -> x == "Success", df)
-
-filter!(:secondary_extinctions => x-> x>0, df)
+preprocessing!(df)
 
 # There are some reallllyyyy small values in here causing extremely large values
 # later on.  These are probably floating point error, we'll reassign these to
 # zero.
 transform!(df, 
     :trophic_range => ByRow(x -> (x<0.01) ? 0 : x) => :trophic_range    
-)
-
-# Add a column for proportion of community gone extinct after a primary
-# extinction. This is to account for differences in community size at the time
-# of primary extinction. Early on, I did some sensitivity analyses to see if
-# this would be problematic. Using raw number of secondary extinctions produced
-# qualitatively the same results.
-transform!(df,
-    [:richness_pre, :secondary_extinctions] =>
-    ((x, y) ->  y ./ x)
-    => :extinction_proportion
 )
 
 # Trophic range as a proportion of community richness. Once I start collecting
@@ -62,6 +45,7 @@ transform!(df,
     ((x, y) ->  x ./ y)
     => :spp_per_trophic_level
 )
+
 #
 # Cascade size ~ Trophic range
 #
