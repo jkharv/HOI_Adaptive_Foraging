@@ -24,7 +24,7 @@ end
 
 function build_fwm(web, gval)
 
-    fwm = (FoodwebModel ∘ optimal_foraging)(web) 
+    fwm = (FoodwebModel ∘ optimal_foraging ∘ AnnotatedHypergraph)(web) 
 
     # --------------- #
     # Add some params #

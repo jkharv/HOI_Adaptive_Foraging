@@ -1,5 +1,5 @@
 # Count the number of basal species in the foodweb.
-function count_basal(web::AnnotatedHypergraph)
+function count_basal(web::SpeciesInteractionNetwork)
 
     count(iszero, (values ∘ generality)(web))
 end
@@ -9,7 +9,7 @@ function niche_model_min_basal(s, c, b)
 
     for i ∈ 1:100
 
-        web = nichemodel(s, c)
+        web = structuralmodel(NicheModel, s, c)
 
         if count_basal(web) >= b
 
