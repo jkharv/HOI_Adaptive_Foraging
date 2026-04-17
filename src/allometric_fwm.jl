@@ -33,7 +33,9 @@ function build_fwm(web, gval)
     traits = DataFrame(species = species(web))
     traits.vulnerability = vulnerability.(Ref(fwm.hg), traits.species);
     traits.generality = generality.(Ref(fwm.hg), traits.species);
-    traits.trophic_level = distancetobase.(Ref(fwm.hg), traits.species, mean);
+    
+    tls = trophic_levels(web)
+    traits.trophic_level = [tls[sp] for sp in traits.species];
 
     # Body Mass
     mass_ratio = 1000;
