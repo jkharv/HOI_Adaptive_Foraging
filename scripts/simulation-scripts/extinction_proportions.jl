@@ -48,6 +48,8 @@ function process_solution(
         net = realized_network(sol, t1)
         trial = secondary_extinctions_during_trial(secondary_extinctions, t1, t2)
 
+        extinctions = collect(Iterators.flatten(last.(trial)))
+
         # Save the state of the sims to disk if this is a large cascade, so we
         # can study it in more depth later.
         # All of the large ones. And a small random chance of saving not-large
@@ -74,7 +76,7 @@ function process_solution(
             realized_web = realized_web_path,
             richness_pre = richness_sol[i1-1],
             richness_post = richness_sol[i2-1],
-            cascade_trophic_range = cascade_trophic_range(net, last.(trial)),
+            cascade_trophic_range = cascade_trophic_range(net, extinctions),
             maximum_trophic_level = maximum_trophic_level(net),
             t1 = t1,
             t2 = t2 
@@ -91,10 +93,11 @@ function simulations(;
     minimum_basal_species = 5,
     number_of_foodwebs  = 5,
     number_of_sequences = 10,
+    n_extinctions = 1,
     ntrajectories = 10,
     g1 = 0.0,
     g2 = 0.5,
-    time_between_extinctions = 1_000.0,
+    time_between_extinctions = EXTINCTION_INTERVAL,
     stem = "niche-model"
     )
 
@@ -106,6 +109,7 @@ function simulations(;
         minimum_basal_species = minimum_basal_species,
         number_of_foodwebs = number_of_foodwebs,
         number_of_sequences = number_of_sequences,
+        n_extinctions = n_extinctions,
         ntrajectories = ntrajectories,
         g1 = g1,
         g2 = g2,
@@ -146,7 +150,8 @@ function simulations(;
                 extinction_order = seq,
                 g1 = g1,
                 g2 = g2,
-                ntrajectories = ntrajectories
+                ntrajectories = ntrajectories,
+                n_extinctions = n_extinctions
             );
 
             data = vcat(sols...)
@@ -167,7 +172,8 @@ end
 simulations(
     species_richness = 10,
     minimum_basal_species = 1,
-    number_of_foodwebs = 2,
+    number_of_foodwebs = 5,
     number_of_sequences = 2,
+    n_extinctions = 2,
     stem = "test",
 )

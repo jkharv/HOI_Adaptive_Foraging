@@ -17,6 +17,14 @@ function preprocessing!(df::DataFrame)
     # rare failure slips in.
     filter!(:retcode => x -> x == "Success", df)
 
+    # Node names get saved in the CSV as strings. We'll turn them back into
+    # Symbols, since that's what everything expects.
+    transform!(df,
+        :target_species =>
+        ByRow(str -> eval(Meta.parse(str))) =>
+        :target_species
+    )
+
     # Load the realized webs from disk, as well as the density of species before
     # the extinction.
     transform!(df,
@@ -64,20 +72,60 @@ function preprocessing!(df::DataFrame)
         => :extinction_proportion
     )
 
+    transform!(df,
+        [:realized_web, :target_species, :cascade] =>
+        ByRow(trophic_measures) =>
+        [
+            :target_trophic_level,
+            :trophic_mean,
+            :trophic_median,
+            :trophic_range
+        ]
+    )
+
     return nothing
 end
 
-const EXTINCTION_INTERVAL = 1000.0
+function trophic_measures(web, target::Vector{Symbol}, cascade)
+
+    if ismissing(web)
+
+        return (missing, missing, missing, missing)
+    end
+
+    tls = trophic_levels(web)
+
+    targets_tls = [tls[t] for t in target]
+    
+    extinctions = Iterators.flatten(last.(cascade))
+
+    extinctions_tls = [tls[x] for x in extinctions]
+
+    if isempty(extinctions_tls)
+        
+        avg1 = missing
+        avg2 = missing
+        range = missing
+    else
+
+        avg1 = mean(extinctions_tls)
+        avg2 = median(extinctions_tls)
+        range = maximum(extinctions_tls) - minimum(extinctions_tls)
+    end
+
+    return (mean(targets_tls), avg1, avg1, range)
+end
 
 """
-TODO: Cascade times already get standardized to be between 0-1_000 (or whateve
+TODO: Cascade times already get standardized to be between 0-1_000 (or whatever
 the extinction interval) ends up being. And then further changed to be between
 0-1 here. I should fold these steps together. That'll get rid of the constant
 too.
 """
-function standardize_extinction_times(cascade::Vector{Tuple{Float64, Symbol}})::Vector{Tuple{Float64, Symbol}}
+function standardize_extinction_times(cascade::Vector{Tuple{Float64, Vector{Symbol}}}
+    )::Vector{Tuple{Float64, Vector{Symbol}}}
 
-    cascade_new = Vector{Tuple{Float64, Symbol}}(undef, length(cascade))
+    cascade_new = Vector{Tuple{Float64, Vector{Symbol}}}(undef, length(cascade))
 
     for (i, (t, sp)) in enumerate(cascade)
 
@@ -88,7 +136,7 @@ function standardize_extinction_times(cascade::Vector{Tuple{Float64, Symbol}})::
     return cascade_new
 end
 
-function parse_cascade_string(str::String)::Vector{Tuple{Float64, Symbol}}
+function parse_cascade_string(str::String)::Vector{Tuple{Float64, Vector{Symbol}}}
 
     val = eval(Meta.parse(str))
 
@@ -96,7 +144,7 @@ function parse_cascade_string(str::String)::Vector{Tuple{Float64, Symbol}}
 
         # val will be parsed as simply Tuple{Float64, Tuple} if it's empty.
         # No bueno.
-        return Vector{Tuple{Float64, Tuple}}()
+        return Vector{Tuple{Float64, Vector{Tuple}}}()
     else
         return val
     end
@@ -120,7 +168,6 @@ function load_realized_web(path::String)
         
         net = jldopen(path)["net"]
         upre = jldopen(path)["u_pre"]
-
     catch
 
         return (missing, missing)

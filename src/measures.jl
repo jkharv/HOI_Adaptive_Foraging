@@ -50,11 +50,11 @@ function maximum_trophic_level(web)::Float64
 end
 
 """
-    cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})
+    cascade_timespan(cascade::Vector{Tuple{Float64, Vector{Symbol}}}})
 
 Returns the total timespan of an extinction cascade.
 """
-function cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})::Float64
+function cascade_timespan(cascade::Vector{Tuple{Float64, Vector{Symbol}}})::Float64
 
     times = first.(cascade)
 
@@ -67,11 +67,11 @@ function cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})::Float64
 end
 
 """
-    cascade_timespan(cascade::Vector{Tuple{Float64, Symbol}})
+    cascade_timespan(cascade::Vector{Tuple{Float64, Vector{Symbol}}})
 
 Returns the mean time to extinction after a primary extinction
 """
-function mean_extinction_time(cascade::Vector{Tuple{Float64, Symbol}})::Float64
+function mean_extinction_time(cascade::Vector{Tuple{Float64, Vector{Symbol}}})::Float64
 
     times = first.(cascade)
 

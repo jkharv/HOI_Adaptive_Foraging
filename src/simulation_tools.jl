@@ -68,32 +68,32 @@ end
 """
     extinction_indices(sol, primary_extinctions)
 
-Returns a `Vector` of the bouding time indices between a primary extinction
+Returns a `Vector` of the bounding time indices between a primary extinction
 and the following primary extinctions. Each entry in the return `Vector`
 is formated as:
 
 
-    (spp::Symbol, i1::Int64, i2::Int64)
+    (spp::Vector{Symbol}, i1::Int64, i2::Int64)
 
 """
 function extinction_indices(sol, primary_extinctions)
 
-    indices = Vector{Tuple{Symbol, Int64, Int64}}()
+    indices = Vector{Tuple{Vector{Symbol}, Int64, Int64}}()
 
-    for (i, (t, sp)) in enumerate(primary_extinctions)
+    for (i, (t, spp)) in enumerate(primary_extinctions)
       
         i1 = index_of_time(sol, t)
 
         if i + 1 <= length(primary_extinctions)
 
-            t_next, sp_next = primary_extinctions[i + 1]
+            t_next, spp_next = primary_extinctions[i + 1]
             i2 = index_of_time(sol, t_next)
         else
 
             i2 = lastindex(sol.t)
         end
 
-        push!(indices, (sp, i1, i2))
+        push!(indices, (spp, i1, i2))
     end
 
     return indices
@@ -143,6 +143,7 @@ process_solution should be a function witht the following signature:
 function simulation_batch(fwm, prob, process_solution::Function;
     extinction_order = shuffle(species(fwm)),
     extinction_times = missing,
+    n_extinctions = 1,
     g1 = 0.0,
     g2 = 0.5,
     ntrajectories = 5
@@ -153,12 +154,11 @@ function simulation_batch(fwm, prob, process_solution::Function;
     @assert g1 < g2
     @assert extinction_order ⊆ species(fwm) 
 
-    n_extinctions = length(extinction_times)
     stepsize = (g2 - g1)/(ntrajectories - 1)
     gs = collect(g1:stepsize:g2)
 
-    primary_extinctions = [Vector{Tuple{Float64, Symbol}}() for i in 1:ntrajectories]
-    secondary_extinctions = [Vector{Tuple{Float64, Symbol}}() for i in 1:ntrajectories]
+    primary_extinctions = [Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
+    secondary_extinctions = [Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
 
     # This function is responsible for taking and index into the batch, `i`, and
     # returning the `ODEProblem` that is to be run. `repeat` is unused but is
@@ -167,10 +167,12 @@ function simulation_batch(fwm, prob, process_solution::Function;
 
         fwm = prob.f.sys
 
-        es = ExtinctionSequenceCallback(fwm, deepcopy(extinction_order), extinction_times;
+        es = ExtinctionSequenceCallback(fwm, 
+            extinction_order, extinction_times;
+            n_extinctions = n_extinctions,
             extinction_history = primary_extinctions[i]
         );
-        et = ExtinctionThresholdCallback(fwm, 1e-15;
+        et = ExtinctionThresholdCallback(fwm, EXTINCTION_THRESHOLD;
             extinction_history = secondary_extinctions[i]
         );
         am = AlphaManifoldCallback(fwm);
@@ -206,7 +208,7 @@ function simulation_batch(fwm, prob, process_solution::Function;
         maxiters = 1e7,
         tstops = extinction_times,
         trajectories = ntrajectories,
-        tspan = (1, 10_000 * n_extinctions + 1_000)
+        tspan = (1, maximum(extinction_times) + 1_000)
     );
 
     return sols
