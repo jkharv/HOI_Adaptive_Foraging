@@ -1,7 +1,7 @@
 include("../../src/HOI_Adaptive_Foraging.jl")
 using .HOI_Adaptive_Foraging
 
-using CairoMakie
+using WGLMakie
 using DataFrames
 using CSV
 using Statistics
@@ -20,8 +20,7 @@ filter!(:richness_pre => x-> x >= 20, df)
 # greater than zero. Lots of cascades have only a single species going
 # secondarily extinct, which leads to inflated amount of zeros and detracts from
 # the interesting features of the distribution.
-# filter!(:cascade_timespan => !isnan, df)
-filter!(:cascade_timespan => (x -> x > 0), df)
+filter!(:cascade_timespan => !isnan, df)
 
 # Again as in previous plots, there are soo many points that a boxplot is not
 # really readible. There are so many outlier points the entire thing is super

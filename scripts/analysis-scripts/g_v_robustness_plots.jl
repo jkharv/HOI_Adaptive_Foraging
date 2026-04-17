@@ -1,13 +1,16 @@
+using Revise
 include("../../src/HOI_Adaptive_Foraging.jl")
 using .HOI_Adaptive_Foraging
 
-using WGLMakie
+# using WGLMakie
 using DataFrames
 using CSV
 using Statistics
-using CategoricalArrays
+# using CategoricalArrays
 
-df = CSV.read("sim-output/rectangular-web-2026-03-16/data.csv", DataFrame)
+# df = CSV.read("sim-output/niche-model-2026-03-16/data.csv", DataFrame)
+
+df = CSV.read("sim-output/test-2026-04-16-d/data.csv", DataFrame)
 
 preprocessing!(df)
 
@@ -239,37 +242,3 @@ Legend(fig[1,2][-1,2],
 )
 
 save("figures/g_v_secondary_extinctions_quantiles.png", fig)
-
-# ---------------------------------------------------------------------- 
-# Coefficient of regression against g at multiple values of richness pre 
-# ---------------------------------------------------------------------- 
-
-richnesses = [ ]
-g_coefs = [ ]
-
-for i in (minimum(df[:, :richness_pre])):(maximum(df[:, :richness_pre]))
-
-    filt = filter(:richness_pre => x -> x ∈ (i-1):(i+1), df)
-    mm = lm(@formula(extinction_proportion ~ g), filt)
-
-    g_coef = coef(mm)[2]
-
-    push!(g_coefs, g_coef)
-    push!(richnesses, i)
-end
-
-fig = Figure() 
-ax = Axis(fig[1,1], 
-    xlabel = "Richness before extinction (± 1)",
-    ylabel = "Regression coefficient of g",
-    title = "Effect of adaptive foraging in communities of different species richness"
-)
-lines!(ax, richnesses, g_coefs)
-hlines!(ax, 0, color = :red)
-save("figures/g_effect_v_richness_pre.png", fig)
-
-# --------------------------------------------------------
-# Linear model 
-# --------------------------------------------------------
-
-mm = lm(@formula(extinction_proportion ~  g * richness_pre), df)

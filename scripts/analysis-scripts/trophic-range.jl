@@ -18,16 +18,9 @@ df = CSV.read("sim-output/niche-model-2026-03-16/data.csv", DataFrame)
 
 preprocessing!(df)
 
-# There are some reallllyyyy small values in here causing extremely large values
-# later on.  These are probably floating point error, we'll reassign these to
-# zero.
-transform!(df, 
-    :trophic_range => ByRow(x -> (x<0.01) ? 0 : x) => :trophic_range    
-)
-
 # Trophic range as a proportion of community richness. Once I start collecting
-# info in the simulations, this should probably be a propotion of the max trophic
-# level in the realized web.
+# info in the simulations, this should probably be a propotion of the max
+# trophic level in the realized web.
 transform!(df,
     [:maximum_trophic_level, :trophic_range] =>
     ((x, y) ->  y ./ x)
@@ -46,9 +39,17 @@ transform!(df,
     => :spp_per_trophic_level
 )
 
-#
-# Cascade size ~ Trophic range
-#
+transform!(df,
+    [:trophic_mean, :target_trophic_level] =>
+    ((x, y) ->  y - x)
+    => :trophic_difference
+)
+
+# ----------------------------------------------------------------------------- #
+# Food web Height v. Width Analyses:                                            #
+# Do cascades happen at different rates in food webs which are short and fat or #
+# tall and skinny? Does adaptive foraging affect these differently?             #
+# ----------------------------------------------------------------------------- #
 
 # Weak adaptive foraging
 filt = filter(:g => x -> x<0.1, df)
@@ -104,36 +105,34 @@ ylims!(ax2, 0, 10)
 
 save("figures/shape-v-cascades.png", fig)
 
-#
-#
-#
-#
-#
+# -------------------------------------------------------- #
+# Trophic Difference Analyses:                             #
+# Are top-down or bottom-up effects implicated more often? #
+# -------------------------------------------------------- #
 
-filt = filter(:g => x -> x>-0.2, df)
-filt = filter(:secondary_extinctions => x -> x>0, filt)
+filt = copy(df)
+filter!(:trophic_difference => !ismissing, filt)
+disallowmissing!(filt, :trophic_difference)
 
-transform!(filt,
-    [:maximum_trophic_level, :spp_per_trophic_level] =>
-    ((x, y) ->  x ./ y)
-    => :test
+f  = Figure(size = (650, 650))
+ax = Axis(f[1,1], xlabel = "g", ylabel = "Trophic Difference") 
+
+boxplot!(ax, 
+    filt[:, :g], 
+    filt[:, :trophic_difference];
+    width = 0.05
 )
 
-#jitter
-xj = 0.05 
-yj = 0.5
+save("figures/trophic_difference_v_g.png", f)
 
-fig = Figure(size = (1600, 850))
-ax1  = Axis(fig[1,1], 
-    ylabel = "Number of Secondary Extinctions", 
-    xlabel = "g",
-    title  = ""
+f  = Figure(size = (650, 650))
+ax = Axis(f[1,1], 
+    xlabel = "Trophic Difference", 
+    ylabel = "Proportion Extinct"
+) 
+scatter!(ax, 
+    filt[:, :trophic_difference], 
+    filt[:, :extinction_proportion]
 )
-empty!(ax1)
-scatter!(ax1, 
-    filt[:, :maximum_trophic_level] + xj*rand(nrow(filt)),
-    filt[:, :spp_per_trophic_level] + yj*rand(nrow(filt)),
-    color = filt[:, :trophic_range],
-    colormap = :bluesreds,
-    markersize = 2*filt[:, :secondary_extinctions]
-)
+
+save("figures/trophic_difference_v_proportion_extinct.png", f)

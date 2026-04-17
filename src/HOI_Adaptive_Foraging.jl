@@ -1,5 +1,9 @@
 module HOI_Adaptive_Foraging
 
+const EXTINCTION_INTERVAL = 2000.0
+const EXTINCTION_THRESHOLD = 1e-10
+export EXTINCTION_INTERVAL, EXTINCTION_THRESHOLD
+
 using SpeciesInteractionNetworks
 using AnnotatedHypergraphs
 using HigherOrderFoodwebs
@@ -7,6 +11,7 @@ using HigherOrderFoodwebs
 using Distributions
 using LinearAlgebra
 using DataFrames
+using JLD2
 
 using DiffEqCallbacks
 using OrdinaryDiffEqTsit5
