@@ -19,13 +19,13 @@ function cascade_trophic_range(web, extinctions::Vector{Symbol})::Float64
         return 0.0 
     end
 
-    tls = (trophic_levels ∘ rescale)(web)
+    tls = (trophic_levels ∘ rescale_network)(web)
     return (maximum ∘ values)(tls) - (minimum ∘ values)(tls)
 end
 
 function maximum_trophic_level(web)::Float64
 
-    tls = (trophic_levels ∘ rescale)(web)
+    tls = (trophic_levels ∘ rescale_network)(web)
     return (maximum ∘ values)(tls)
 end
 
