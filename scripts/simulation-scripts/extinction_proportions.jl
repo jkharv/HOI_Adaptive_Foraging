@@ -20,9 +20,6 @@ using UUIDs
 
 @info "Dependencies Loaded"
 
-const LARGE_CASCADE_CUTOFF = 1
-const SAVE_PROBABILITY = 0.01
-
 function process_solution(
     sol,   
     g, 
@@ -50,21 +47,12 @@ function process_solution(
 
         extinctions = collect(Iterators.flatten(last.(trial)))
 
-        # Save the state of the sims to disk if this is a large cascade, so we
-        # can study it in more depth later.
-        # All of the large ones. And a small random chance of saving not-large
-        # ones so that we have smaller cascades for comparison.
-        realized_web_path = "NA"
-        if ((richness_sol[i1-1] - richness_sol[i2-1]) > LARGE_CASCADE_CUTOFF) | (rand() < SAVE_PROBABILITY)
-
-            mkpath(output_dir * "/realized_webs")
-
-            realized_web_path = output_dir * "/realized_webs/" * (string ∘ uuid4)() * ".jld2" 
-            jldsave(realized_web_path, true; 
-                    net = net,
-                    u_pre = sol[i1-1],
-            )
-        end
+        mkpath(output_dir * "/realized_webs")
+        realized_web_path = output_dir * "/realized_webs/" * (string ∘ uuid4)() * ".jld2" 
+        jldsave(realized_web_path, true; 
+                net = net,
+                u_pre = sol[i1-1],
+        )
 
         push!(df, (
             foodweb_number = foodweb_number,
@@ -86,7 +74,7 @@ function process_solution(
 
     return df
 end
-
+1
 function simulations(;
     species_richness = 20,
     connectance = 0.3,
