@@ -32,6 +32,35 @@ function preprocessing!(df::DataFrame)
         ByRow(load_realized_web)
         => [:realized_web, :density_pre]
     )
+ 
+    # Trim the network of any extinct species before we go looking at trophic
+    # metrics, just to be sure.
+    transform!(df,
+        [:realized_web, :density_pre] =>
+        ByRow((web, u) -> begin
+
+            if ismissing(web) | ismissing(u)
+                return missing
+            else
+                return trim_network(web, nonzerospecies(web, u))   
+            end
+        end)
+        => :realized_trim
+    )
+
+    # Create a version of the realized web with probabilistic edge weights. 
+    transform!(df,
+        [:realized_trim] =>
+        ByRow(x -> begin
+        
+            if ismissing(x)        
+                return missing
+            else
+                return rescale_network(x)
+            end
+        end)
+        => :realized_prob
+    )
 
     # The Vector{Tuple{Float64, Symbol}} that we use to keep track  of the
     # extinction cascade gets saved as a String when we output to CSV. We'll
@@ -54,6 +83,13 @@ function preprocessing!(df::DataFrame)
         => :cascade_timespan 
     )
 
+    # Count the number of primary extinctions.
+    transform!(df,
+        :target_species =>
+        ByRow(length)
+        => :n_targets
+    )
+
     # Count the number of secondary extinctions in each cascade.
     transform!(df,
         :cascade =>
@@ -67,13 +103,13 @@ function preprocessing!(df::DataFrame)
     # see if this would be problematic. Using raw number of secondary
     # extinctions produced qualitatively the same results.
     transform!(df,
-        [:richness_pre, :secondary_extinctions] =>
-        ((x, y) ->  y ./ x)
+        [:richness_pre, :secondary_extinctions, :n_targets] =>
+        ByRow((x, y, z) ->  y / (x - z))
         => :extinction_proportion
     )
 
     transform!(df,
-        [:realized_web, :target_species, :cascade] =>
+        [:realized_trim, :target_species, :cascade] =>
         ByRow(trophic_measures) =>
         [
             :target_trophic_level,
@@ -84,6 +120,11 @@ function preprocessing!(df::DataFrame)
     )
 
     return nothing
+end
+
+function HigherOrderFoodwebs.trim_network(web::Missing, nz::Any)::Missing
+
+    return missing
 end
 
 function trophic_measures(web, target::Vector{Symbol}, cascade)
@@ -178,4 +219,18 @@ function load_realized_web(path::String)
     upre = upre[1:richness(net)]
 
     return (net, upre)
+end
+
+function nonzerospecies(x::Missing, y::Any)
+
+    return missing
+end
+
+function nonzerospecies(
+    web::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
+    u::Vector{Float64}
+    )::Vector{T} where T
+
+    indxs = findall(map(!iszero, u))
+    return species(web)[indxs]
 end
