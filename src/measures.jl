@@ -43,7 +43,7 @@ function cascade_timespan(cascade::Vector{Tuple{Float64, Vector{Symbol}}})::Floa
         return 0 
     end
 
-    return maximum(times) - minimum(times)
+    return maximum(times)
 end
 
 """
