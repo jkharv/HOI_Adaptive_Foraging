@@ -1,6 +1,40 @@
 # This file contains functions that are common to all of the simulation scripts.
 
 """
+    treatments(; args...) :: NamedTuple
+
+Given keyword arguments with values or collections of values for parameters return
+all combinations of those parameter values as a vector of `NamedTuple`s where the names
+match those given as a keyword for the argument
+
+== Example
+
+treatments(a = 1, b = [1,2,3], c = 4)
+ 
+3-element Vector{@NamedTuple{a::Int64, b::Int64, c::Int64}}:
+ (a = 1, b = 1, c = 4)
+ (a = 1, b = 2, c = 4)
+ (a = 1, b = 3, c = 4)
+
+"""
+function treatments(; args...)
+
+    pnames = Tuple(p[1] for p in args)
+    pvals  = [p[2] for p in args]
+    
+    # Find the combinations
+    combos = (collect ∘ reduce)(Iterators.product, pvals)
+     
+    # Flatten the tuples
+    combos = map((collect ∘ Iterators.flatten), combos) 
+
+    # Turn them into named tuples
+    combos = map(NamedTuple{pnames}, combos)
+
+    return combos
+end
+
+"""
     make_output_dir!(stem)
 
 Make an output directory for the simulation under ./sim-output

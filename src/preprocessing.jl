@@ -119,7 +119,45 @@ function preprocessing!(df::DataFrame)
         ]
     )
 
+    # Average indegree of the target species.
+    transform!(df,
+        [:realized_trim, :target_species] =>
+        ByRow(avg_target_indegree) =>
+        :avg_target_indegree 
+    )
+
+    # Average outdegree of the target species.
+    transform!(df,
+        [:realized_trim, :target_species] =>
+        ByRow(avg_target_outdegree) =>
+        :avg_target_outdegree 
+    )
+
+    # Average degree of the target species.
+    transform!(df,
+        [:avg_target_outdegree, :avg_target_indegree] =>
+        ByRow((x,y)-> x+y) => :avg_target_degree
+    )
+
     return nothing
+end
+
+function avg_target_indegree(web, spp)
+
+    if ismissing(web)
+        return missing
+    end
+
+    return mean(generality.(Ref(web), spp))
+end
+
+function avg_target_outdegree(web, spp)
+
+    if ismissing(web)
+        return missing
+    end
+
+    return mean(vulnerability.(Ref(web), spp))
 end
 
 function HigherOrderFoodwebs.trim_network(web::Missing, nz::Any)::Missing

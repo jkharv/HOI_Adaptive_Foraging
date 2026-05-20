@@ -5,6 +5,8 @@ using WGLMakie
 using DataFrames
 using CSV
 using GLM
+using StatsBase
+using Distributions
 using Statistics
 using SpeciesInteractionNetworks 
 using HigherOrderFoodwebs
@@ -39,11 +41,11 @@ function distance_weight(
     return min(forward, reverse)
 end
 
-function cascade_mean_density(
+function cascade_density(
     qweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
     tweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
     pweb::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}},
-
+    summary_func::Function,
     cascade::Vector{Tuple{Float64, Vector{T}}}, 
     u::Vector{Float64}
     )::Float64 where T
@@ -55,15 +57,10 @@ function cascade_mean_density(
 
     spp = last.(cascade)
 
-    acc = 0
-    for sp in spp
+    densities = [target_density(qweb, tweb, pweb, sp, u) for sp in spp]
+    densities = densities ./ mean(densities)
 
-        acc += target_density(qweb, tweb, pweb, sp, u)
-    end
-
-    avg = mean(filter(!iszero, u))
-
-    return (acc - avg) / avg 
+    return summary_func(densities)
 end
 
 function total_flux(
@@ -208,10 +205,12 @@ end
 #
 #
 
-df1 = CSV.read("sim-output/new-tl-algorithm-2026-04-20/data.csv", DataFrame)
-df2 = CSV.read("sim-output/two-extinctions-2026-04-21/data.csv", DataFrame)
+df1 = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
+df2 = CSV.read("sim-output/two-extinctions-2026-04-30/data.csv", DataFrame)
+df3 = CSV.read("sim-output/three-extinctions-2026-04-30/data.csv", DataFrame)
+df4 = CSV.read("sim-output/four-extinctions-2026-04-30/data.csv", DataFrame)
 
-df = vcat(df1, df2)
+df = vcat(df1, df2, df3, df4)
 
 preprocessing!(df)
 
@@ -228,7 +227,8 @@ transform!(df,
 transform!(df,
     [:realized_web, :realized_trim, :realized_prob, :target_species, :density_pre] =>
     ByRow((qweb, tweb, pweb, t, d) -> nearby_density(qweb, tweb, pweb, t, d) / sum(d)) =>
-    :nearby_density
+    :nearby_density,
+    threads = true
 )
 
 transform!(df,
@@ -258,9 +258,18 @@ transform!(df,
     [:realized_web, :realized_trim, :realized_prob, :cascade, :density_pre] =>
     ByRow(
         (qweb, tweb, pweb, c, d) -> 
-            cascade_mean_density(qweb, tweb, pweb, c, d)
+            cascade_density(qweb, tweb, pweb, mean, c, d)
         ) =>
     :cascade_mean_density
+)
+
+transform!(df,
+    [:realized_web, :realized_trim, :realized_prob, :cascade, :density_pre] =>
+    ByRow(
+        (qweb, tweb, pweb, c, d) -> 
+            cascade_density(qweb, tweb, pweb, median, c, d)
+        ) =>
+    :cascade_median_density
 )
 
 # ------------------------------------------------------------------------------ #
@@ -269,85 +278,120 @@ transform!(df,
 # of the resultant cascade? Does g function differently in these cases?          #
 # ------------------------------------------------------------------------------ #
 
-function gridify(xs, ys, nx, ny, xmax, ymax)
-
-    w = xmax / nx
-    h = ymax / ny
-
-    m = zeros(Int64, nx, ny)
-
-    xs = Integer.(floor.((xs ./ w) .+ 1))
-    ys = Integer.(floor.((ys ./ h) .+ 1))
-
-    for (x, y) in zip(xs, ys)
-
-        m[y,x] += 1
-    end
-
-    return m
-end
-
 filt = copy(df)
 filter!(:extinction_proportion => !iszero, filt)
-filter!(:extinction_proportion => x-> x>0.2, filt)
 filter!(:n_targets => x -> x == 1, filt)
 
 f  = Figure(size = (1200, 750))
-ax = Axis(f[1,1], xlabel = "Proportion Extinct", ylabel = "Target Density")
+ax = Axis(f[1,1], xlabel = "Target Density", ylabel = "Proportion Extinct")
 
-# scatter!(ax,
-#     filt[:, :extinction_proportion],
-#     filt[:, :target_density]
-# )
+scatter!(ax,
+    filt[:, :target_density],
+    filt[:, :extinction_proportion]
+)
 
-n = 12
-m = gridify(filt[:, :extinction_proportion], filt[:, :target_density], n, n, 0.5, 1.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0.2:(0.5/10):0.5, 0:(1.0/10):1.0, mp)
+ax = Axis(f[1,2], xlabel = "Nearby Density", ylabel = "Proportion Extinct")
 
-ax = Axis(f[1,2], xlabel = "Proportion Extinct", ylabel = "Nearby Density")
+scatter!(ax,
+    filt[:, :nearby_density],
+    filt[:, :extinction_proportion]
+)
 
-# scatter!(ax,
-#     filt[:, :extinction_proportion],
-#     filt[:, :nearby_density]
-# )
-
-m = gridify(filt[:, :extinction_proportion], filt[:, :nearby_density], n, n, 0.5, 1.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):1.0, mp)
+save("figures/density_v_proportion_extinct_one_target.png", f)
 
 # Two targets
 
 filt = copy(df)
 filter!(:extinction_proportion => !iszero, filt)
 filter!(:n_targets => x -> x == 2, filt)
-ax = Axis(f[2,1], xlabel = "Proportion Extinct", ylabel = "Target Density")
 
-# scatter!(ax, 
-#     filt[:, :extinction_proportion], 
-#     filt[:, :target_density]
-# )
+f  = Figure(size = (1200, 750))
+ax = Axis(f[1,1], xlabel = "Proportion Extinct", ylabel = "Target Density")
 
-m = gridify(filt[:, :extinction_proportion], filt[:, :target_density], n, n, 0.5, 1.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):1.0, mp)
+scatter!(ax, 
+    filt[:, :extinction_proportion], 
+    filt[:, :target_density]
+)
 
-ax = Axis(f[2,2], xlabel = "Proportion Extinct", ylabel = "Nearby Density")
+ax = Axis(f[1,2], xlabel = "Proportion Extinct", ylabel = "Nearby Density")
 
-m = gridify(filt[:, :extinction_proportion], filt[:, :nearby_density], n, n, 0.5, 1.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):1.0, mp)
+scatter!(ax,
+    filt[:, :extinction_proportion], 
+    filt[:, :nearby_density]
+)
 
-# scatter!(ax,
-#     filt[:, :extinction_proportion], 
-#     filt[:, :nearby_density]
-# )
+save("figures/density_v_proportion_extinct_two_targets.png", f)
 
-save("figures/density_v_proportion_extinct_heatmap.png", f)
+# Three targets
+
+filt = copy(df)
+filter!(:extinction_proportion => !iszero, filt)
+filter!(:n_targets => x -> x == 3, filt)
+
+f  = Figure(size = (1200, 750))
+ax = Axis(f[1,1], xlabel = "Proportion Extinct", ylabel = "Target Density")
+
+scatter!(ax, 
+    filt[:, :extinction_proportion], 
+    filt[:, :target_density]
+)
+
+ax = Axis(f[1,2], xlabel = "Proportion Extinct", ylabel = "Nearby Density")
+
+scatter!(ax,
+    filt[:, :extinction_proportion], 
+    filt[:, :nearby_density]
+)
+
+save("figures/density_v_proportion_extinct_three_targets.png", f)
+
+# Three targets
+
+filt = copy(df)
+filter!(:extinction_proportion => !iszero, filt)
+filter!(:n_targets => x -> x == 4, filt)
+
+f  = Figure(size = (1200, 750))
+ax = Axis(f[1,1], xlabel = "Proportion Extinct", ylabel = "Target Density")
+
+scatter!(ax, 
+    filt[:, :extinction_proportion], 
+    filt[:, :target_density]
+)
+
+ax = Axis(f[1,2], xlabel = "Proportion Extinct", ylabel = "Nearby Density")
+
+scatter!(ax,
+    filt[:, :extinction_proportion], 
+    filt[:, :nearby_density]
+)
+
+save("figures/density_v_proportion_extinct_four_targets.png", f)
+
+# ------------------------------------------------------------------------------ #
+# Target Indegree:                                                                #
+# Is there a relationship between the density of the target species and the size #
+# of the resultant cascade? Does g function differently in these cases?          #
+# ------------------------------------------------------------------------------ #
+
+filt = copy(df)
+filter!(:extinction_proportion => !iszero, filt)
+filter!(:n_targets => x -> x == 1, filt)
+
+f  = Figure(size = (1200, 750))
+ax = Axis(f[1,1], xlabel = "Proportion Extinct", ylabel = "Target In-degree")
+
+scatter!(ax,
+    filt[:, :extinction_proportion],
+    filt[:, :avg_target_indegree]
+)
+
+ax = Axis(f[1,2], xlabel = "Proportion Extinct", ylabel = "Target Out-degree")
+
+scatter!(ax,
+    filt[:, :extinction_proportion],
+    filt[:, :avg_target_outdegree]
+)
 
 # ------------------------------------------------------------------------------ #
 # Flux:                                                                
@@ -358,29 +402,22 @@ filter!(:extinction_proportion => !iszero, filt)
 filter!(:n_targets => x -> x == 1, filt)
 
 f  = Figure(size = (1000, 650))
-ax = Axis(f[1,1],  ylabel = "Target Flux")
+ax = Axis(f[1,1],  
+    ylabel = "Extinction Proportion",
+    xlabel = "Target Flux"
+)
 
-# scatter!(ax, 
-#     filt[:, :extinction_proportion], 
-#     filt[:, :target_flux]
-# )
+scatter!(ax, 
+    filt[:, :target_flux], 
+    filt[:, :extinction_proportion]
+)
 
-m = gridify(filt[:, :extinction_proportion], filt[:, :target_flux], n, n, 0.5, 1.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):1.0, mp)
+ax = Axis(f[1,2], xlabel = "Nearby Flux")
 
-ax = Axis(f[1,2], ylabel = "Nearby Flux")
-
-# scatter!(ax, 
-#     filt[:, :extinction_proportion], 
-#     filt[:, :nearby_flux]
-# )
-
-m = gridify(filt[:, :extinction_proportion], filt[:, :nearby_flux], n, n, 0.5, 2.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):2.0, mp)
+scatter!(ax, 
+    filt[:, :nearby_flux], 
+    filt[:, :extinction_proportion]
+)
 
 # now with two targets
 
@@ -390,119 +427,48 @@ filter!(:n_targets => x -> x == 2, filt)
 
 ax = Axis(f[2,1], xlabel = "Proportion Extinct", ylabel = "Target Flux")
 
-# scatter!(ax, 
-#     filt[:, :extinction_proportion], 
-#     filt[:, :target_flux]
-# )
-
-m = gridify(filt[:, :extinction_proportion], filt[:, :target_flux], n, n, 0.5, 1.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):1.0, mp)
+scatter!(ax, 
+    filt[:, :extinction_proportion], 
+    filt[:, :target_flux]
+)
 
 ax = Axis(f[2,2], xlabel = "Proportion Extinct", ylabel = "Nearby Flux")
 
-# scatter!(ax, 
-#     filt[:, :extinction_proportion], 
-#     filt[:, :nearby_flux]
-# )
+scatter!(ax, 
+    filt[:, :extinction_proportion], 
+    filt[:, :nearby_flux]
+)
 
-m = gridify(filt[:, :extinction_proportion], filt[:, :nearby_flux], n, n, 0.5, 2.0)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):2.0, mp)
+save("figures/flux_v_cascade_size.png", f)
 
-save("figures/flux_v_cascade_size_heatman.png", f)
-
-# -------------------------------------------------- #
-# Average density of the species which go extinct:   #
-# Are the species that go extinct rare, or abundant? #
-# -------------------------------------------------- #
+# --------------------------------------------------------- #
+# Are large cascades dominated by rare or abundant species. #
+# --------------------------------------------------------- #
 
 filt = copy(df)
-filter!(:n_targets => x -> x == 1, filt)
-filter!(:g => x-> x<0.25, filt)
+# filter!(:n_targets => x -> x == 1, filt)
 filter!(:extinction_proportion => !iszero, filt)
 
 f  = Figure(size = (1000, 650))
 ax = Axis(f[1,1], 
-    xlabel = "Proportion of community extinct", 
-    ylabel = "mean density of secondarily extinct species",
-    title  = "Low Adaptive Foraging (g < 0.25)"
+    xlabel = "Proportion extinct", 
+    ylabel = "Median density of secondarily extinct species",
 )
-
-m = gridify(filt[:, :extinction_proportion], filt[:, :nearby_flux], n, n, 0.5, 25)
-mp = m ./ sum(m)
-mp = log.(mp)
-heatmap!(ax, 0:(0.5/10):0.5, 0:(1.0/10):25, mp)
 
 scatter!(ax, 
     filt[:, :extinction_proportion],
-    filt[:, :cascade_mean_density],
-    # width = 0.05
+    filt[:, :cascade_median_density],
 )
-xlims!(ax, [0.0, 0.5])
+xlims!(ax, [2/20, 0.7])
 
-filt = copy(df)
-filter!(:n_targets => x -> x == 2, filt)
-filter!(:g => x-> x>0.25, filt)
-filter!(:extinction_proportion => !iszero, filt)
-
-ax1 = Axis(f[1,2], 
-    xlabel = "Proportion of community extinct", 
-    ylabel = "mean density of secondarily extinct species",
-    title  = "High Adaptive Foraging (g > 0.25)"
-)
-scatter!(ax1, 
-    filt[:, :extinction_proportion],
-    filt[:, :cascade_mean_density],
-    # width = 0.05
-)
-xlims!(ax1, [0.0, 0.5])
-
-# Now with two targets
-
-filt = copy(df)
-filter!(:n_targets => x -> x == 1, filt)
-filter!(:g => x-> x<0.25, filt)
-filter!(:extinction_proportion => !iszero, filt)
-
-ax = Axis(f[2,1], 
-    xlabel = "Proportion of community extinct", 
-    ylabel = "mean density of secondarily extinct species",
-    title  = "Low Adaptive Foraging (g < 0.25)"
-)
-scatter!(ax, 
-    filt[:, :extinction_proportion],
-    filt[:, :cascade_mean_density],
-    # width = 0.05
-)
-xlims!(ax, [0.0, 0.5])
-
-filt = copy(df)
-filter!(:n_targets => x -> x == 2, filt)
-filter!(:g => x-> x>0.25, filt)
-filter!(:extinction_proportion => !iszero, filt)
-
-ax1 = Axis(f[2,2], 
-    xlabel = "Proportion of community extinct", 
-    ylabel = "mean density of secondarily extinct species",
-    title  = "High Adaptive Foraging (g > 0.25)"
-)
-scatter!(ax1, 
-    filt[:, :extinction_proportion],
-    filt[:, :cascade_mean_density],
-    # width = 0.05
-)
-xlims!(ax1, [0.0, 0.5])
-
-save("figures/mean_density_v_g.png", f)
+save("figures/median-cascade-densisty-v-cascade-size.png", f)
 
 # ------------------------------------------------------------------ #
 # Is there more biomass in communities which have adaptive foraging? #
 # ------------------------------------------------------------------ #
 
 filt = copy(df)
+filter!(:n_targets => x -> x == 2, filt)
 
 transform!(filt,
     [:density_pre] =>
@@ -510,18 +476,19 @@ transform!(filt,
     :foodweb_total_biomass
 )
 
-f  = Figure(size = (650, 650))
+f  = Figure(size = (1000, 650))
 ax = Axis(f[1,1], 
-    xlabel = "g", 
-    ylabel = "Food Web Total Biomass",
+    xlabel = "Strength of Adaptive Foraging", 
+    ylabel = "Log Food Web Total Biomass",
 )
 boxplot!(ax, 
     filt[:, :g],
     filt[:, :foodweb_total_biomass],
-    width = 0.05,
-    dodge = filt[:, :n_targets],
-    color = map(d-> d == 1 ? :blue : :red, filt[:, :n_targets]),
+    width = 0.05 
 )
+
+fit = lm(@formula(foodweb_total_biomass ~ g), filt)
+ablines!(ax, coef(fit)[1], coef(fit)[2], color = :red, linewidth = 4)
 
 save("figures/biomass_v_g.png", f)
 
@@ -529,26 +496,40 @@ save("figures/biomass_v_g.png", f)
 # Is biomass more even in communities with adaptive foraging? #
 # ----------------------------------------------------------- # 
 
-filt = copy(df)
-
-transform!(filt,
-    [:density_pre] =>
-    ByRow(x -> log(quantile(filter(!iszero, x), 0.1))) =>
-    :foodweb_biomass_q10
-)
-
-f  = Figure(size = (650, 650))
+f  = Figure(size = (1200, 750))
 ax = Axis(f[1,1], 
-    xlabel = "g", 
-    ylabel = "Log 10th Percentile of Species Biomass",
+    xlabel = "Adaptation Rate", 
+    ylabel = "10th Percentile of Species Density",
+    xticks = unique(filt[:, :g]),
+    xtickformat = "{:.2f}"
 )
-boxplot!(ax, 
-    filt[:, :g],
-    filt[:, :foodweb_biomass_q10];
-    width = 0.05,
-    dodge = filt[:, :n_targets],
-    color = map(d-> d == 1 ? :blue : :red, filt[:, :n_targets]),
-)
-ylims!(ax, [-25, 0])
 
-save("figures/biomass_log_q10_v_g.png", f)
+ls = []
+ns = []
+for n in unique(df[:, :n_targets])
+
+    filt = copy(df)
+    filter!(:n_targets => x -> x == n, filt)
+
+    biomasses = DataFrame()
+    for row in eachrow(filt)
+
+        for d in row[:density_pre]
+
+            if !iszero(d)
+                push!(biomasses, (g = row[:g], density = d))
+            end
+        end
+    end
+
+    gdf = groupby(biomasses, :g)
+    gdf = combine(gdf, :density => x->quantile(x, 0.1))
+
+    x = lines!(ax, gdf[:, :g], gdf[:, :density_function], linewidth = 3)
+    push!(ls, x)
+    push!(ns, n)
+end
+
+Legend(f[1,2], ls, string.(ns), "Primary Extinctions")
+
+save(".figures/biomass-eveness-g.png", f)

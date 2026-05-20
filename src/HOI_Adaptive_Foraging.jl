@@ -39,7 +39,8 @@ export cascade_trophic_range, secondary_extinctions_during_trial
 export mean_extinction_time, maximum_trophic_level
 
 include("../src/simulation_tools.jl")
-export make_output_dir!, save_parameters!, simulation_batch, extinction_indices
+export make_output_dir!, save_parameters!
+export simulation_batch, extinction_indices, treatments
 
 include("../src/alpha_manifold.jl")
 export AlphaManifoldCallback

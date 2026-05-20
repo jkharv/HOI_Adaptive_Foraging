@@ -9,47 +9,45 @@ using Statistics
 using CategoricalArrays
 
 # One extinction
-df1 = CSV.read("sim-output/new-tl-algorithm-2026-04-20/data.csv", DataFrame)
+df1 = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
 # Two extinctions
-df2 = CSV.read("sim-output/two-extinctions-2026-04-20/data.csv", DataFrame)
+df2 = CSV.read("sim-output/two-extinctions-2026-04-30/data.csv", DataFrame)
 # Three extinctions
-df3 = CSV.read("sim-output/three-extinctions-2026-04-23/data.csv", DataFrame)
+df3 = CSV.read("sim-output/three-extinctions-2026-04-30/data.csv", DataFrame)
+# Four extinctions
+df4 = CSV.read("sim-output/four-extinctions-2026-04-30/data.csv", DataFrame)
 
-preprocessing!(df1)
-preprocessing!(df2)
-preprocessing!(df3)
+df = vcat(df1, df2, df3, df4)
+
+preprocessing!(df)
 
 # We've already shown there to be only a small effect on small webs. We're not
 # really interested in doing that again with rectangular webs, so we'll limit
 # ourselves here to only the larger webs.
-filter!(:richness_pre => x-> x >= 20, df1)
-filter!(:richness_pre => x-> x >= 20, df2)
-filter!(:richness_pre => x-> x >= 20, df3)
+filter!(:richness_pre => x-> x >= 20, df)
 
 # --------------------------------------------- #
 # Probability of a cascade of any size occuring #
 # --------------------------------------------- #
 
-gdf1 = groupby(df1, :g)
-gdf2 = groupby(df2, :g)
-gdf3 = groupby(df3, :g)
+gdf = groupby(df, [:n_targets, :g])
 
-f(x) = count(!iszero, x) / length(x)
-p_extinction1 = combine(gdf1,
-    :extinction_proportion => f => :p_extinction
-);
-p_extinction2 = combine(gdf2,
-    :extinction_proportion => f => :p_extinction
-);
-p_extinction3 = combine(gdf3,
-    :extinction_proportion => f => :p_extinction
+p_extinction = combine(gdf,
+    :extinction_proportion => 
+    (x -> count(!iszero, x) / length(x))
+    => :p_extinction
 );
 
 fig = Figure(size = (1000, 500))
 ax  = Axis(fig[1,1], xlabel = "g", ylabel = "P(cascade)")
-lines!(ax, p_extinction1[:, :g], p_extinction1[:, :p_extinction]; color = :black)
-lines!(ax, p_extinction2[:, :g], p_extinction2[:, :p_extinction]; color = :red)
-lines!(ax, p_extinction3[:, :g], p_extinction3[:, :p_extinction]; color = :red)
+for n in unique(df[:, :n_targets])
+
+    filt = filter(:n_targets => x-> x == n, p_extinction)
+    sort!(filt, :g)
+    lines!(ax, filt[:, :g], filt[:, :p_extinction])
+end
+
+ylims!(ax, [0.8, 1.0])
 
 save("figures/prob-extinctions-disturbance-size.png", fig)
 
@@ -57,12 +55,7 @@ save("figures/prob-extinctions-disturbance-size.png", fig)
 # Expected proportion of the community going extinct given that a cascade occurs. #
 # ------------------------------------------------------------------------------- #
 
-filt1 = filter(:secondary_extinctions => !iszero, df1)
-filt2 = filter(:secondary_extinctions => !iszero, df2)
-filt3 = filter(:secondary_extinctions => !iszero, df3)
-filt = vcat(filt1, filt2, filt3)
-
-filter!(:richness_pre => x-> x>25, filt)
+filt = filter(:secondary_extinctions => !iszero, df)
 
 colours = map(filt[:, :n_targets]) do x
 
@@ -79,12 +72,13 @@ end
 
 fig = Figure(size = (1200, 750))
 ax  = Axis(fig[1,1], 
-    xlabel = "g", 
-    ylabel = "Proportion extinct",
+    xlabel = "Adaptation Rate", 
+    ylabel = "Cascade Size",
     xticks = unique(filt[:, :g]),
     xtickformat = "{:.2f}"
     
 )
+
 boxplot!(ax, 
     filt[:, :g], 
     filt[:, :extinction_proportion];

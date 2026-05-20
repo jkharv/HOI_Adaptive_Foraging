@@ -8,42 +8,24 @@ using GLM
 using Statistics
 using CategoricalArrays
 using QuantileRegressions
-
-function boundary(sptl::Float64, s::Float64)::Float64
-
-    return s / sptl
-end
+using LsqFit
 
 # One extinction
-df1 = CSV.read("sim-output/new-tl-algorithm-2026-04-20/data.csv", DataFrame)
+df1 = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
 # Two extinctions
-df2 = CSV.read("sim-output/two-extinctions-2026-04-20/data.csv", DataFrame)
+df2 = CSV.read("sim-output/two-extinctions-2026-04-30/data.csv", DataFrame)
+# Three extinctions
+df3 = CSV.read("sim-output/three-extinctions-2026-04-30/data.csv", DataFrame)
+# Four extinctions
+df4 = CSV.read("sim-output/four-extinctions-2026-04-30/data.csv", DataFrame)
 
-preprocessing!(df1)
-preprocessing!(df2)
+df = vcat(df1, df2, df3, df4)
 
-# Trophic range as a proportion of community richness. Once I start collecting
-# info in the simulations, this should probably be a propotion of the max
-# trophic level in the realized web.
-[df1, df2] .|> x -> transform!(x,
-    [:maximum_trophic_level, :trophic_range] =>
-    ((x, y) ->  y ./ x)
-    => :trophic_scale
-);
+filter!(:richness_pre => x-> x >= 20, df)
 
-[df1, df2] .|> x -> transform!(x,
-    [:secondary_extinctions, :trophic_range] =>
-    ((x, y) ->  x ./ y)
-    => :extinctions_per_trophic_level
-);
+preprocessing!(df)
 
-[df1, df2] .|> x -> transform!(x,
-    [:richness_pre, :maximum_trophic_level] =>
-    ((x, y) ->  x ./ y)
-    => :spp_per_trophic_level
-);
-
-[df1, df2] .|> x -> transform!(x,
+transform!(df,
     [:trophic_mean, :target_trophic_level] =>
     ((x, y) ->  y - x)
     => :trophic_difference
@@ -55,23 +37,52 @@ preprocessing!(df2)
 # Positive is top-down, negative is bottom-up              #
 # -------------------------------------------------------- #
 
-filt = vcat(df1, df2)
+filt = copy(df)
 filter!(:trophic_difference => !ismissing, filt)
 disallowmissing!(filt, :trophic_difference)
 
 f  = Figure(size = (800, 800))
-ax = Axis(f[1,1], xlabel = "g", ylabel = "Trophic Difference") 
+ax = Axis(f[1,1]; 
+    xlabel = "Strength of Adaptive Foraging", 
+    ylabel = "Trophic Difference",
+    xticks = unique(filt[:, :g]),
+    xtickformat = "{:.2f}"
+) 
 
 boxplot!(ax, 
     filt[:, :g], 
     filt[:, :trophic_difference];
-    dodge = filt[:, :n_targets],
-    color = map(d-> d == 1 ? :blue : :red, filt[:, :n_targets]),
-    width = 0.05
+    width = 0.05,
 )
 
 save("figures/trophic_difference_v_g.png", f)
 
-# I made a graph of proportion extinct v. trophic difference but there is no
-# discernable difference between large and small cascades wrt wether top-down or
-# bottom-up are implicated.
+# --------------------------------------------------------- #
+# Are top-down and bottom-up effects implicated differently #
+# for different cascade sizes? Yes                          #
+# --------------------------------------------------------- #
+
+filt = copy(df)
+filter!(:trophic_difference => !ismissing, filt)
+disallowmissing!(filt, :trophic_difference)
+
+f  = Figure(size = (800, 800))
+ax = Axis(f[1,1]; 
+    xlabel = "Cascade Size", 
+    ylabel = "Trophic Difference",
+    xtickformat = "{:.2f}"
+) 
+
+scatter!(ax, 
+    filt[:, :extinction_proportion], 
+    filt[:, :trophic_difference];    
+)
+
+model(t, p) = p[1] .+ (p[2] .* t)
+fitOLS = curve_fit(model, filt[:, :extinction_proportion], filt[:, :trophic_difference], [1.0, 1.0])
+wt = 1 ./ fitOLS.resid.^2
+fitWLS = curve_fit(model, filt[:, :extinction_proportion], filt[:, :trophic_difference], wt, [0.0, 0.0])
+
+ablines!(ax, fitWLS.param[1], fitWLS.param[2], color=:red, linewidth = 3)
+
+save("figures/trophic_difference_v_cascade_size.png", f)

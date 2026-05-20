@@ -18,6 +18,7 @@ GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 HigherOrderFoodwebs = "573a6084-d739-11ed-30ee-8d814a9e0f06"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
 QuantileRegressions = "c6596682-b856-542f-9fff-31404643e889"
 RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
@@ -31,3 +32,6 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 AnnotatedHypergraphs = {rev = "main", url = "https://github.com/jkharv/AnnotatedHypergraphs.jl.git"}
 FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl.git"}
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl.git"}
+
+[compat]
+LsqFit = "0.16.0"

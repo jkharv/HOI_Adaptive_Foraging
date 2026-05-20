@@ -6,57 +6,77 @@ using DataFrames
 using CSV
 using Statistics
 using CategoricalArrays
+using GLM
 
-df = CSV.read("sim-output/niche-model-2026-03-16/data.csv", DataFrame)
+# One extinction
+df1 = CSV.read("sim-output/new-tl-algorithm-2026-04-20/data.csv", DataFrame)
+# Two extinctions
+df2 = CSV.read("sim-output/two-extinctions-2026-04-20/data.csv", DataFrame)
+# Three extinctions
+df3 = CSV.read("sim-output/three-extinctions-2026-04-23/data.csv", DataFrame)
+# Four extinctions
+df4 = CSV.read("sim-output/three-extinctions-2026-04-23/data.csv", DataFrame)
 
-preprocessing!(df)
+preprocessing!(df1)
+preprocessing!(df2)
+preprocessing!(df3)
+preprocessing!(df4)
+
+# foodweb_number and sequence_number are made non-unique by doing this.
+df = vcat(df1, df2, df3, df4)
 
 # We've already shown there to be only a small effect on small webs. We're not
 # really interested in doing that again with rectangular webs, so we'll limit
 # ourselves here to only the larger webs. 
 filter!(:richness_pre => x-> x >= 20, df)
 
-# Only interested in cascades that actually happen. And have a timespan of
-# greater than zero. Lots of cascades have only a single species going
-# secondarily extinct, which leads to inflated amount of zeros and detracts from
-# the interesting features of the distribution.
-filter!(:cascade_timespan => !isnan, df)
+filter!(:secondary_extinctions => !iszero, df)
 
-# Again as in previous plots, there are soo many points that a boxplot is not
-# really readible. There are so many outlier points the entire thing is super
-# messy. We'll plot lines for various percentiles to get an idea of the
-# distribution.
-gdf = combine(groupby(df, :g), 
-    :cascade_timespan => (x -> quantile(x, 0.5))  => :q50,
-    :cascade_timespan => (x -> quantile(x, 0.75)) => :q75,
-    :cascade_timespan => (x -> quantile(x, 0.9))  => :q90,
-    :cascade_timespan => (x -> quantile(x, 0.95)) => :q95,
-    :cascade_timespan => (x -> quantile(x, 0.99)) => :q99,
-    :cascade_timespan => (x -> count(iszero, x) / length(x)) => :prop_zero
+# We'll make a new column which is unique up to g
+transform!(df, [:foodweb_number, :sequence_number, :n_targets] =>
+    ByRow((x,y,z) ->
+        string(x) * string(y) * string(z)
+    ) => :id
 )
-sort!(gdf, :g)
 
-# Panel 1:
-# Percentile lines showing how the distribution of cascade timespans changes
-# with g.
-fig = Figure(size = (1_000, 500))
-ax  = Axis(fig[1,1:2], xlabel = "g", ylabel = "Cascade timespan")
-xlims!(ax, 0, 0.5)
-legend_entries = []
-for l in names(gdf, r"q.")
-    push!(legend_entries, lines!(ax, gdf[:, :g], gdf[:, l]))
+gdf = groupby(df, :id)
+
+lms = DataFrame()
+for group in gdf
+
+    slope = coef(lm(@formula(cascade_timespan ~ g), group))[2]
+    push!(lms, (
+        n_targets = group[:, :n_targets][1],
+        slope = slope 
+    )
+    )
 end
 
-# Panel 2:
-# Proportion of cascades which only result in 1 species going extinct (not
-# counting the primary extinction).
-ax = Axis(fig[1,3], xlabel = "g", ylabel = "Proportion of size 1 cascades")
-xlims!(ax, 0, 0.5)
-lines!(ax, gdf[:, :g], gdf[:, :prop_zero], color = :black)
+colours = map(lms[:, :n_targets]) do x
 
-Legend(fig[1,3][2,2], 
-    legend_entries,
-    [L"50^{th} %", L"75^{th} %", L"90^{th} %", L"95^{th} %", L"99^{th} %"]
+    if x == 1
+        return :blue
+    elseif x == 2
+        return :green
+    elseif x == 3
+        return :red
+    else
+        return :grey
+    end
+end
+
+fig = Figure(size = (1200, 750))
+ax  = Axis(fig[1,1], 
+    ylabel = "Cascade Timespan LM",
+    xticks = unique(lms[:, :n_targets]),
+    xtickformat = "{:2d}"
+)
+boxplot!(ax, 
+    lms[:, :n_targets], 
+    lms[:, :slope];
+    # dodge = filt[:, :n_targets],
+    # color = filt[:, :g],
+    # width = 0.05,
 )
 
-save("figures/cascade-timespan.svg", fig)
+lm(@formula(cascade_timespan ~ g), df)
