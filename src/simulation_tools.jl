@@ -191,8 +191,10 @@ function simulation_batch(fwm, prob, process_solution::Function;
     stepsize = (g2 - g1)/(ntrajectories - 1)
     gs = collect(g1:stepsize:g2)
 
-    primary_extinctions = [Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
-    secondary_extinctions = [Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
+    primary_extinctions = [
+        Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
+    secondary_extinctions = [
+        Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
 
     # This function is responsible for taking and index into the batch, `i`, and
     # returning the `ODEProblem` that is to be run. `repeat` is unused but is
