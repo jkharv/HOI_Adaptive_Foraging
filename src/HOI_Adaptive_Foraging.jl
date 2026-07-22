@@ -32,15 +32,14 @@ include("../src/allometric_fwm.jl")
 export build_fwm
 
 include("../src/measures.jl")
-export median_interaction_strength, time_window_population_cv
-export eigenstability, time_window_community_cv, richness
-export cascade_timespan, eigencentrality_of_spp
-export cascade_trophic_range, secondary_extinctions_during_trial
-export mean_extinction_time, maximum_trophic_level
+export median_interaction_strength, leading_eigenvalue, richness
+export cascade_timespan, cascade_trophic_range
+export secondary_extinctions_during_trial, mean_extinction_time
+export maximum_trophic_level
 
 include("../src/simulation_tools.jl")
-export make_output_dir!, save_parameters!
-export simulation_batch, extinction_indices, treatments
+export make_output_dir!, save_parameters!, simulation_batch
+export extinction_indices, treatments
 
 include("../src/alpha_manifold.jl")
 export AlphaManifoldCallback
