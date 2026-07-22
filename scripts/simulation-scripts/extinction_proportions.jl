@@ -54,6 +54,9 @@ function process_solution(
                 u_pre = sol[i1-1],
         )
 
+        # Just after the extinction occurs
+        λ = leading_eigenvalue(sol, sol.t[i1 + 1])
+
         push!(df, (
             foodweb_number = foodweb_number,
             sequence_number = sequence_number,
@@ -66,6 +69,8 @@ function process_solution(
             richness_post = richness_sol[i2-1],
             cascade_trophic_range = cascade_trophic_range(net, extinctions),
             maximum_trophic_level = maximum_trophic_level(net),
+            real_eigenvalue = real(λ),
+            imag_eigenvalue = imag(λ),
             t1 = t1,
             t2 = t2 
         )
@@ -158,10 +163,10 @@ function simulations(;
 end
 
 simulations(
-    species_richness = 10,
+    species_richness = 30,
     minimum_basal_species = 1,
-    number_of_foodwebs = 5,
-    number_of_sequences = 2,
-    n_extinctions = 2,
+    number_of_foodwebs = 1,
+    number_of_sequences = 1,
+    n_extinctions = 1,
     stem = "test",
 )
