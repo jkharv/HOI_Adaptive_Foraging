@@ -24,13 +24,25 @@ function preprocessing!(df::DataFrame)
         ByRow(str -> eval(Meta.parse(str))) =>
         :target_species
     )
+    
+    transform!(df,
+        [:realized_web, :foodweb_number] => 
+        ByRow(load_initial_web) 
+        => :initial_web
+    )
 
     # Load the realized webs from disk, as well as the density of species before
     # the extinction.
     transform!(df,
         :realized_web =>
         ByRow(load_realized_web)
-        => [:realized_web, :density_pre]
+        => [:realized_web, :density_pre, :alpha_pre]
+    )
+ 
+    transform!(df,
+        [:initial_web, :alpha_pre] =>
+        ByRow(alpha_web)
+        => :alpha_web
     )
  
     # Trim the network of any extinct species before we go looking at trophic
@@ -229,6 +241,39 @@ function parse_cascade_string(str::String)::Vector{Tuple{Float64, Vector{Symbol}
     end
 end
 
+"""
+    alpha_web(web::AnnotatedHypergraph, alphas::Vector{Float64})
+
+Produce a network weighted by foraging preferences.
+"""
+function alpha_web(web::AnnotatedHypergraph, alphas::Vector{Float64})::SpeciesInteractionNetwork{Unipartite{Symbol}, Quantitative{Float64}}
+
+    trophic_intx = filter(!isloop, interactions(web))
+
+    m = zeros(Float64, richness(web), richness(web))
+
+    for (i, intx) in enumerate(trophic_intx)
+
+        s = findfirst(x->x==subject(intx), species(web))
+        o = findfirst(x->x==object(intx), species(web))
+
+        m[s,o] = alphas[i]
+    end
+
+    return SpeciesInteractionNetwork(
+        (Unipartite ∘ copy ∘ species)(web), 
+        Quantitative(m)
+    )
+end
+
+function load_initial_web(path::String, fwnum::Int64)
+
+    s = split(path, "/") # This path leads to the realized web
+    path = s[1] *"/"*s[2] * "/initial_webs/foodweb_$fwnum.jld2"
+
+    return jldopen(path)["web"]
+end
+
 function load_realized_web(path::String)
 
     net = missing
@@ -254,9 +299,10 @@ function load_realized_web(path::String)
 
     # Only the beggining bit of this vector are species densities. The rest are
     # the foraging parameters.
+    alpha_pre = upre[richness(net)+1:end]
     upre = upre[1:richness(net)]
 
-    return (net, upre)
+    return (net, upre, alpha_pre)
 end
 
 function nonzerospecies(x::Missing, y::Any)
