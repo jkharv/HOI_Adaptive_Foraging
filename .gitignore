@@ -1,5 +1,6 @@
 Manifest.toml
 
+scratch.jl
 figures/*
 sim-output/*
 
