@@ -26,10 +26,13 @@ function (amca::AlphaManifoldCallbackAffect)(integrator)
         # Put each alpha back into [0, 1], and enforce sum(alphas) = 1
         for alpha in group
 
-            integrator.u[alpha] /= total 
-            u_modified!(integrator, true)
+            integrator.u[alpha] /= total             
         end
+
+        u_modified!(integrator, true)
     end
+
+    return nothing
 end
 
 """
@@ -82,7 +85,7 @@ function is_trait_variable(fwm, v)
 end
 
 """
-    AlphaManifoldCallbackAffect
+    AlphaManifoldCallback
 
 This is a callback to be used with the ODE Solver. It ensures that for each
 consumer, the sum of all their alpha values remains one (or close to it). 
