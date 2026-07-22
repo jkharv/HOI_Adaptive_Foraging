@@ -67,11 +67,11 @@ end
     median_interaction_strength(sol)
 
 Calculates the median interaction over time in the community.
-sol.prob.f.sys
+
 Interaction strength, here, is measured as preference parameters (α) of a
 consumer species on it's resources.
 """
-function median_interaction_strength(sol, sp)::Float64
+function median_interaction_strength(sol::ODESolution, sp::Symbol)::Float64
 
     fwm = sol.prob.f.sys
 
@@ -107,7 +107,7 @@ function median_interaction_strength(sol, sp)::Float64
     return median_alpha
 end
 
-function median_interaction_strength(sol)::Float64
+function median_interaction_strength(sol::ODESolution)::Float64
 
     fwm = sol.prob.f.sys
     out = Vector{Float64}(undef, length(sol.t))
@@ -123,114 +123,13 @@ function median_interaction_strength(sol)::Float64
 end
 
 """
-    time_window_population_cv(sol, window_size)
+    leading_eigenvalue(sol::ODESolution, t::Float64)::ComplexF64
 
-Calculate a time series of community-averaged population coefficient of variation 
-using a rolling time-window of `window_size`. The average at each time step, is of
-only the species with non-zero mean population over the time window.
+Returns the leading (complex) eigenvalue of the system at time `t`
 """
-function time_window_population_cv(sol, window_size; 
-    step_size = 0.1, window_alignment = :CENTRE
-)::Float64
+function leading_eigenvalue(sol::ODESolution, t::Float64)::ComplexF64
 
-    fwm = sol.prob.f.sys
-    spp = variables(fwm, type = SPECIES_VARIABLE)
-
-    cvs = zeros(Float64, length(sol.t))
-
-    # Calculate CoV for each species
-    for (i, t) in enumerate(sol.t)
- 
-        t1, t2 = time_window(sol, window_size, t, window_alignment)
-
-        m = [(mean ∘ sol)(t1:step_size:t2, idxs = sp) for sp in spp]
-        v = [(var  ∘ sol)(t1:step_size:t2, idxs = sp) for sp in spp]
-
-        covs = v ./ m 
-
-        cvs[i] = (mean ∘ filter)(!isnan, covs)
-    end
-
-    return cvs
-end
-
-"""
-    time_window_community_cv(sol, window_size)
-
-Calculate a time series of coefficient of variation of total community biomass
-accross a rolling window of size `window_size`.
-"""
-function time_window_community_cv(sol, window_size; window_alignment = :CENTRE)::Float64
-
-    fwm = sol.prob.f.sys
-    spp = variables(fwm, type = SPECIES_VARIABLE)
-
-    cvs = zeros(Float64, length(sol.t))
-
-    for (i, t) in enumerate(sol.t)
-
-        t1, t2 = time_window(sol, window_size, t, window_alignment)
-
-        community_total = sum([sol(t1:0.001:t2, idxs = sp) for sp in spp])
-
-        v = var(community_total)
-        m = mean(community_total)
-
-        if iszero(m)
-            cvs[i] = 0.0
-        else
-            cvs[i] = v/m
-        end    
-    end
-
-    return cvs
-end
-
-"""
-    eigenstability(sol)
-
-Calculate the real part of the leading eigenvalue of the jacobian matrix
-at every point t along the time series.
-"""
-function eigenstability(sol; species_only = true, sparseness = 1)::Float64
-
-    error("Broken, Don't use THIS!")    
-
-    jac! = get_jacobian(sol) 
-    fwm  = get_foodwebmodel(sol)
-
-    n = (length ∘ variables)(fwm)
-    s = richness(fwm)
-
-    jval = zeros(n,n)
-
-    param_vals = get_value.(Ref(fwm.params), variables(fwm.params))
-
-    out = zeros(Float64, length(sol.t))
-    missing_points = (trues ∘ length)(sol.t)
-
-    for i in eachindex(sol.t)
-
-        if i % sparseness == 0 
-
-            continue
-        end
-
-        t = sol.t[i]
-
-        jac!(jval, sol(t), param_vals, t)
-
-        if species_only 
-            e = (maxabs ∘ real)(eigen(jval).values)
-        else 
-            e = (maxabs ∘ real)(eigen(jval).values)
-        end
-
-        out[i] = e
-        missing_points[i] = false
-    end
-
-    return (out, missing_points) 
+    return (last ∘ eigvals)(jacobian(sol, t), sortby = abs)
 end
 
 """
@@ -238,7 +137,7 @@ end
 
 Returns a timeseries of species richness over time from an `ODESolution`
 """
-function HigherOrderFoodwebs.richness(sol)::Vector{Int64}
+function HigherOrderFoodwebs.richness(sol::ODESolution)::Vector{Int64}
 
     out = Vector{Int64}()
     sizehint!(out, length(sol.t))
@@ -283,61 +182,46 @@ function get_foodwebmodel(sol)
     return fwm
 end
 
-function get_jacobian(sol)
+"""
+    jacobian(sol::ODESolution, t::Float64)::Matrix{Float64}
 
-    return sol.prob.f.jac
-end
+Returns the jacobian of the system at time `t` obtained via finite differencing.
+Out-of-place version.
+"""
+function jacobian(sol::ODESolution, t::Float64)::Matrix{Float64}
 
-function time_window(sol, window_size, t, type = :CENTRE)
+    fwm = get_foodwebmodel(sol)
+    jac_du = zeros(Float64, 
+        (length ∘ variables)(fwm.vars), 
+        (length ∘ variables)(fwm.vars)
+    )
+    jacobian!(jac_du, sol, t) 
 
-    @assert type in [:CENTRE, :LEFT, :RIGHT]
-    @assert 0 <= t <= sol.t[end]
-    @assert window_size <= sol.t[end] - sol.t[1]
-
-    if type == :CENTRE
-
-        t1 = max(t - window_size/2.0, sol.t[1])
-        t2 = min(t + window_size/2.0, sol.t[end])
-
-        return (t1, t2)
-    end
-
-    if type == :LEFT
-
-        t1 = max(t - window_size, sol.t[1])
-        t2 = min(t, sol.t[end])
-
-        return (t1, t2)
-    end
-
-    if type == :RIGHT
-
-        t1 = max(t, sol.t[1])
-        t2 = min(t + window_size, sol.t[end])
-
-        return (t1, t2)
-    end
-
+    return jac_du
 end
 
 """
-    maxabs(x::Vector{Number})
+    jacobian(sol::ODESolution, t::Float64)::Matrix{Float64}
 
-Compare based on abs value but return the signed value.
+Returns the jacobian of the system at time `t` obtained via finite differencing.
+In-place version.
 """
-function maxabs(x::Vector{<:Number})
+function jacobian!(
+    jac_du::Matrix{Float64}, 
+    sol::ODESolution, 
+    t::Float64
+    )::Nothing
 
-    max = x[1]
+    fwm = get_foodwebmodel(sol)
+    ps = sol.prob.p
+    u  = sol(t, idxs = get_index(fwm.vars, variables(fwm.vars)))
+    f(du, u) = sol.prob.f.f(du, u, ps, t)
 
-    for i in x
+    du = zeros(Float64, length(u))
+    
+    FiniteDiff.finite_difference_jacobian!(jac_du, f, u)
 
-        if abs(i) > abs(max)
-
-            max = i
-        end
-    end
-
-    return max
+    return nothing 
 end
 
 function neighbouring_species(web, sp, r = 1)::Set{Symbol}
