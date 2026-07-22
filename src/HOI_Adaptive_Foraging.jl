@@ -9,18 +9,18 @@ using AnnotatedHypergraphs
 using HigherOrderFoodwebs
 
 using Distributions
-using LinearAlgebra
 using DataFrames
 using JLD2
+using Dates
 
 using DiffEqCallbacks
 using OrdinaryDiffEqTsit5
+using FiniteDiff
+using LinearAlgebra
+using SparseArrays
 
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
-
-using SparseArrays
-using Dates
 
 include("../src/niche_model_min_basal.jl")
 export niche_model_min_basal

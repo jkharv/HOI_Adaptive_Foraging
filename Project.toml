@@ -13,8 +13,11 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 FoodwebPlots = "7dc9db8c-3692-4617-a276-47618cd48976"
 GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 HigherOrderFoodwebs = "573a6084-d739-11ed-30ee-8d814a9e0f06"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -34,4 +37,4 @@ FoodwebPlots = {rev = "main", url = "https://github.com/jkharv/FoodwebPlots.jl.g
 HigherOrderFoodwebs = {rev = "main", url = "https://github.com/jkharv/HigherOrderFoodwebs.jl.git"}
 
 [compat]
-LsqFit = "0.16.0"
+FiniteDiff = "2.32.0"
