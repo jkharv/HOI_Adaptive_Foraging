@@ -37,7 +37,7 @@ function process_solution(
     richness_sol = richness(sol)
 
     # Run for each cascade in series.
-    for (sp, i1, i2) in idxs
+    for (cascade_number, (sp, i1, i2)) in enumerate(idxs)
 
         t1 = sol.t[i1]
         t2 = sol.t[i2]
@@ -60,6 +60,7 @@ function process_solution(
         push!(df, (
             foodweb_number = foodweb_number,
             sequence_number = sequence_number,
+            cascade_number = cascade_number,
             retcode = sol.retcode,
             g = g,
             target_species = sp, 
