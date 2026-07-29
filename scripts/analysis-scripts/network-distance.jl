@@ -5,6 +5,7 @@ using DataFrames
 using CSV
 using GLM
 using StatsBase
+using Statistics
 using Distributions
 import WGLMakie as Makie
 using Statistics
@@ -12,7 +13,7 @@ using SpeciesInteractionNetworks
 using DataStructures
 using HigherOrderFoodwebs
 
-df = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
+df = CSV.read("sim-output/1-extinctions-2026-07-07/data.csv", DataFrame)
 
 preprocessing!(df)
 
@@ -20,32 +21,37 @@ preprocessing!(df)
 # filter!(:density_pre => !ismissing, df)
 filter!(:richness_pre => x-> x >= 20, df)
 
-function sample_network(
-    web::SpeciesInteractionNetwork{Unipartite{T}, <:Interactions}, 
-    pthreshold::Float64
-    )::SpeciesInteractionNetwork{Unipartite{T}, Binary{Bool}} where T
+web = df.alpha_web[1]
+u   = df.density_pre[1]
+threshold = 0.1
 
+function sample_web(
+    web::SpeciesInteractionNetwork{Unipartite{Symbol}, Quantitative{Float64}},
+    u::Vector{Float64},
+    threshold::Float64
+    )::SpeciesInteractionNetwork{Unipartite{Symbol}, Binary{Bool}}
 
-    retained_intx = filter(p -> last(p) >= pthreshold, interactions(web))
+    # Retained species
+    indxs = findall(!iszero, u[1:richness(web)])
+    spp_retained = species(web)[indxs]
+    extinct_spp  = setdiff(species(web), spp_retained)
 
-    retained_spp = Set{Symbol}()
-    for (s, o, p) in retained_intx
+    intxs_retained = filter(
+        x -> (x[1] ∉ extinct_spp) & (x[2] ∉ extinct_spp) & (x[3] >= threshold), 
+        interactions(web)
+    )
 
-        push!(retained_spp, s)
-        push!(retained_spp, o)
+    adj_new = zeros(Bool, length(spp_retained), length(spp_retained)) 
+
+    for (s, o, v) in intxs_retained
+
+        sindx = findfirst(x-> x == s, spp_retained)
+        oindx = findfirst(x-> x == o, spp_retained)
+        
+        adj_new[sindx, oindx] = true
     end
-    retained_spp = collect(retained_spp)
 
-    edges = zeros(Bool, length(retained_spp), length(retained_spp))
-
-    new_network = SpeciesInteractionNetwork(Unipartite(retained_spp), Binary(edges))
-
-    for (s, o, p) in retained_intx
-
-        new_network[s,o] = true
-    end
-
-    return new_network
+    return SpeciesInteractionNetwork(Unipartite(spp_retained), Binary(adj_new))
 end
 
 gdf = groupby(df, [:foodweb_number, :sequence_number, :g])
@@ -58,12 +64,20 @@ for g in gdf
         continue
     end
 
+    pre  = sample_web(g[1, :alpha_web], g[1, :density_pre], 0.01)
+    post = sample_web(g[2, :alpha_web], g[1, :density_pre], 0.01)
+
+    density_pre = g[1, :density_pre]
+    q10 = quantile(density_pre, 0.1)
+
     push!(pairs,
         (
-            pre = sample_network(g[1, :realized_trim], 0.0), 
-            post = sample_network(g[2, :realized_trim], 0.0),
+            pre = pre, 
+            post = post,
             extinction_proportion = g[1, :extinction_proportion],
-            g = g[1, :g]
+            g = g[1, :g],
+            density_pre = density_pre,
+            q10 = q10
         ) 
     )
 end
@@ -86,11 +100,11 @@ transform!(pairs,
     => :prop_shared
 )
 
-pairs.prop_shared
-
 fig = Makie.Figure(size = (1200, 800)) 
 ax  = Makie.Axis(fig[1,1]; 
     xlabel = "Cascade Size", 
     ylabel = "Proportion Shared Interactions"
 )
-Makie.scatter!(ax, pairs.extinction_proportion, pairs.prop_shared)
+empty!(ax)
+Makie.scatter!(ax, pairs.q10, pairs.prop_shared)
+Makie.boxplot!(ax, pairs.g, pairs.prop_shared, width = 0.01)
