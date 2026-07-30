@@ -27,7 +27,8 @@ function process_solution(
     secondary_extinctions,
     foodweb_number,
     sequence_number,
-    output_dir
+    output_file,
+    output_file_lock
 )
 
     idxs = extinction_indices(sol, primary_extinctions)
@@ -47,12 +48,14 @@ function process_solution(
 
         extinctions = collect(Iterators.flatten(last.(trial)))
 
-        mkpath(output_dir * "/realized_webs")
-        realized_web_path = output_dir * "/realized_webs/" * (string ∘ uuid4)() * ".jld2" 
-        jldsave(realized_web_path, true; 
-                net = net,
-                u_pre = sol[i1-1],
-        )
+        trial_id = (string ∘ uuid4)() 
+        realized_web_path = "realized_webs/$trial_id"
+        lock(output_file_lock) do
+            jldopen(output_file, "a+", compress = ZstdFilter()) do f 
+                f[realized_web_path] = net
+                f["densities/$trial_id"] = sol[i1-1]
+            end
+        end
 
         # Just after the extinction occurs
         λ = leading_eigenvalue(sol, sol.t[i1 + 1])
@@ -95,19 +98,20 @@ function simulations(;
     stem = "niche-model"
     )
 
-    output_dir = make_output_dir!(stem)
+    output_file = make_output_file!(stem)
+    output_file_lock = ReentrantLock()
 
-    save_parameters!(output_dir;
-        species_richness = species_richness,
-        connectance = connectance,
-        minimum_basal_species = minimum_basal_species,
-        number_of_foodwebs = number_of_foodwebs,
-        number_of_sequences = number_of_sequences,
-        n_extinctions = n_extinctions,
-        ntrajectories = ntrajectories,
-        g1 = g1,
-        g2 = g2,
-        time_between_extinctions = time_between_extinctions
+    parameters = Dict(
+        :species_richness => species_richness,
+        :connectance => connectance,
+        :minimum_basal_species => minimum_basal_species,
+        :number_of_foodwebs => number_of_foodwebs,
+        :number_of_sequences => number_of_sequences,
+        :n_extinctions => n_extinctions,
+        :ntrajectories => ntrajectories,
+        :g1 => g1,
+        :g2 => g2,
+        :time_between_extinctions => time_between_extinctions
     )
 
     for fwm_num in 1:number_of_foodwebs
@@ -123,10 +127,10 @@ function simulations(;
             extra_transient_time = 1_000
         )
 
-        mkpath(output_dir * "/initial_webs")
-        jldsave(output_dir * "/initial_webs/foodweb_$fwm_num.jld2", true; 
-            web = fwm.hg, traits = traits
-        )
+        jldopen(output_file, "a+", compress = ZstdFilter()) do f
+            f["initial_webs/foodweb_$fwm_num"] = fwm.hg
+            f["traits/traits_$fwm_num"] = traits
+        end
 
         @info "Assembled FoodwebModel $fwm_num"
 
@@ -137,7 +141,12 @@ function simulations(;
             seq = (shuffle ∘ species)(fwm)
             times = collect((1_000.0:time_between_extinctions:(length(seq) * 1_000.0)))
 
-            ps(x, y, z, w) = process_solution(x, y, z, w, fwm_num, seq_num, output_dir)
+            ps(x, y, z, w) = process_solution(x, y, z, w, 
+                fwm_num, 
+                seq_num, 
+                output_file, 
+                output_file_lock
+            )
 
             sols = simulation_batch(fwm, prob, ps;
                 extinction_times = times,
@@ -148,14 +157,16 @@ function simulations(;
                 n_extinctions = n_extinctions
             );
 
-            data = vcat(sols...)
+            csvpath = output_file[1:end-4] * "csv"
 
+            data = vcat(sols...)
+          
             if (fwm_num == 1) & (seq_num == 1)
 
-                CSV.write(output_dir * "/data.csv", data)
+                CSV.write(csvpath, data)
             else
 
-                CSV.write(output_dir * "/data.csv", data; append = true)
+                CSV.write(csvpath, data; append = true)
             end
         end
     end

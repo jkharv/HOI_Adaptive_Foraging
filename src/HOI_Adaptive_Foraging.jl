@@ -38,7 +38,7 @@ export secondary_extinctions_during_trial, mean_extinction_time
 export maximum_trophic_level
 
 include("../src/simulation_tools.jl")
-export make_output_dir!, save_parameters!, simulation_batch
+export make_output_file!, save_parameters!, simulation_batch
 export extinction_indices, treatments
 
 include("../src/alpha_manifold.jl")

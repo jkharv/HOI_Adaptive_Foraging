@@ -35,7 +35,7 @@ function treatments(; args...)
 end
 
 """
-    make_output_dir!(stem)
+    make_output_file!(stem)
 
 Make an output directory for the simulation under ./sim-output
 of the form "stem" * current_date * [a-z].
@@ -43,49 +43,32 @@ of the form "stem" * current_date * [a-z].
 If it gets to z without finding an available name, just do less
 simualtions in a day, cause it'll throw and error.
 """
-function make_output_dir!(stem)
+function make_output_file!(stem)::String
 
-    output_dir = "sim-output/$stem-" * string(Dates.today())
+    output_file = "sim-output/$stem-" * string(Dates.today())
 
-    if ispath(output_dir)
+    if ispath(output_file * ".jld2")
 
-        output_dir *= "-a"
+        output_file *= "-a"
     end
     
     count = 2
-    while ispath(output_dir)
+    while ispath(output_file * ".jld2")
 
         if count > 26
             error("try doing less simulations in a day")
         end
 
-        prefix = output_dir[begin:end-1]
-        output_dir = prefix * ('a':'z')[count]
+        prefix = output_file[begin:end-1]
+        output_file = prefix * ('a':'z')[count]
         count += 1
     end
 
-    mkpath(output_dir)
+    output_file *= ".jld2"
 
-    return output_dir
-end
+    jldsave(output_file, compress = ZstdFilter())
 
-"""
-    save_parameters!(output_dir; kwargs...)
-
-Save the parameters of simulation run to the output directory as
-`simulation_parameters.txt`. Parameters are given this function as
-a list of arbitrary keyword arguments.
-"""
-function save_parameters!(output_dir; kwargs...)
-
-    open(output_dir * "/simulation-parameters.txt", "a") do io 
-        for args in kwargs
-
-            println(io, args)
-        end
-    end
-
-    return
+    return output_file
 end
 
 """
