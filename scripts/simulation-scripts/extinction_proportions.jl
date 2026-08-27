@@ -20,6 +20,82 @@ using UUIDs
 
 @info "Dependencies Loaded"
 
+function simulation_batch(fwm, prob, process_solution::Function;
+    extinction_order = shuffle(species(fwm)),
+    extinction_times = missing,
+    n_extinctions = 1,
+    g1 = 0.0,
+    g2 = 0.5,
+    ntrajectories = 5
+    )
+
+    @assert ntrajectories > 2
+    @assert !ismissing(extinction_times)
+    @assert g1 < g2
+    @assert extinction_order ⊆ species(fwm) 
+
+    stepsize = (g2 - g1)/(ntrajectories - 1)
+    gs = collect(g1:stepsize:g2)
+
+    primary_extinctions = [
+        Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
+    secondary_extinctions = [
+        Vector{Tuple{Float64, Vector{Symbol}}}() for i in 1:ntrajectories]
+
+    # This function is responsible for taking and index into the batch, `i`, and
+    # returning the `ODEProblem` that is to be run. `repeat` is unused but is
+    # required by the `EnsembleProblem` API.
+    function prob_func(prob, i, repeat)
+
+        fwm = prob.f.sys
+
+        es = ExtinctionSequenceCallback(fwm, 
+            extinction_order, extinction_times;
+            n_extinctions = n_extinctions,
+            extinction_history = primary_extinctions[i]
+        );
+        et = ExtinctionThresholdCallback(fwm, EXTINCTION_THRESHOLD;
+            extinction_history = secondary_extinctions[i]
+        );
+        am = AlphaManifoldCallback(fwm);
+        cb = CallbackSet(et, es, am);
+
+        return remake(prob,
+            callback = cb,
+            p = Dict(:g => gs[i]),
+        )
+    end
+
+    function out_func(sol, i)
+
+        ret = process_solution(
+            sol,
+            gs[i],
+            primary_extinctions[i],
+            secondary_extinctions[i]
+        )
+
+        return (ret, false)
+    end
+
+    eprob = EnsembleProblem(prob;
+        prob_func = prob_func,
+        output_func = out_func
+    )
+
+    @time sols = solve(eprob,
+        Tsit5(),
+        EnsembleThreads();
+        force_dtmin = true,
+        maxiters = 1e7,
+        tstops = extinction_times,
+        trajectories = ntrajectories,
+        tspan = (1, maximum(extinction_times) + 1_000)
+    );
+
+    return sols
+end
+
 function process_solution(
     sol,   
     g, 
@@ -57,9 +133,6 @@ function process_solution(
             end
         end
 
-        # Just after the extinction occurs
-        λ = leading_eigenvalue(sol, sol.t[i1 + 1])
-
         push!(df, (
             foodweb_number = foodweb_number,
             sequence_number = sequence_number,
@@ -73,8 +146,6 @@ function process_solution(
             richness_post = richness_sol[i2-1],
             cascade_trophic_range = cascade_trophic_range(net, extinctions),
             maximum_trophic_level = maximum_trophic_level(net),
-            real_eigenvalue = real(λ),
-            imag_eigenvalue = imag(λ),
             t1 = t1,
             t2 = t2 
         )
@@ -124,7 +195,7 @@ function simulations(;
         prob = ODEProblem(fwm)
         prob = assemble_foodweb(prob;
             solver = Tsit5(),
-            extra_transient_time = 1_000
+            extra_transient_time = 5_000
         )
 
         jldopen(output_file, "a+", compress = ZstdFilter()) do f

@@ -3,7 +3,7 @@
 # anything that didn't need to be done during the simulation when the
 # time-series itself was available.
 
-function preprocessing!(df::DataFrame)
+function preprocessing!(df::DataFrame, f::JLD2.JLDFile)
 
     # Any smaller than this and we can hardly call it a foodweb anymore. Some
     # other analyses further restrict this to get at the interaction of size and
@@ -24,21 +24,40 @@ function preprocessing!(df::DataFrame)
         ByRow(str -> eval(Meta.parse(str))) =>
         :target_species
     )
-    
+ 
     transform!(df,
-        [:realized_web, :foodweb_number] => 
-        ByRow(load_initial_web) 
+        :foodweb_number => 
+        ByRow(x -> f["initial_webs/foodweb_$x"]) 
         => :initial_web
     )
 
-    # Load the realized webs from disk, as well as the density of species before
-    # the extinction.
+    # accidentally left the relized_web field formatted as a fs path from when we where
+    # still storing each in a seperate file.
+    # TODO Change this.
     transform!(df,
         :realized_web =>
-        ByRow(load_realized_web)
-        => [:realized_web, :density_pre, :alpha_pre]
+        ByRow(x-> x[15:end])
+        => :trial_id
+    )
+
+    transform!(df,
+        :trial_id =>
+        ByRow(x -> f["realized_webs/$x"])
+        => :realized_web
     )
  
+    transform!(df,
+        [:trial_id, :realized_web] =>
+        ByRow((x, y) -> f["densities/$x"][1:richness(y)])
+        => :density_pre
+    )
+ 
+    transform!(df,
+        [:trial_id, :realized_web] =>
+        ByRow((x, y) -> f["densities/$x"][richness(y)+1:end])
+        => :alpha_pre
+    )
+
     transform!(df,
         [:initial_web, :alpha_pre] =>
         ByRow(alpha_web)
@@ -272,37 +291,6 @@ function load_initial_web(path::String, fwnum::Int64)
     path = s[1] *"/"*s[2] * "/initial_webs/foodweb_$fwnum.jld2"
 
     return jldopen(path)["web"]
-end
-
-function load_realized_web(path::String)
-
-    net = missing
-    upre = missing
-
-    # This isn't strictly necessary since the try-catch already handles the file
-    # not existing along with any other possible problems. But when path is NA
-    # (most trials) JLD2 produces a warning when trying to open the non-valid
-    # path, and it's super annoying.
-    if !ispath(path)
-
-        return (missing, missing)
-    end
-
-    try
-        
-        net = jldopen(path)["net"]
-        upre = jldopen(path)["u_pre"]
-    catch
-
-        return (missing, missing)
-    end
-
-    # Only the beggining bit of this vector are species densities. The rest are
-    # the foraging parameters.
-    alpha_pre = upre[richness(net)+1:end]
-    upre = upre[1:richness(net)]
-
-    return (net, upre, alpha_pre)
 end
 
 function nonzerospecies(x::Missing, y::Any)

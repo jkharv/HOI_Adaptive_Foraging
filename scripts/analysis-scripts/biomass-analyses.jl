@@ -4,6 +4,7 @@ using .HOI_Adaptive_Foraging
 using WGLMakie
 using DataFrames
 using CSV
+using JLD2
 using GLM
 using StatsBase
 using Distributions
@@ -12,48 +13,17 @@ using SpeciesInteractionNetworks
 using DataStructures
 using HigherOrderFoodwebs
 
-function distance_weight(
-    web::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}}, 
-    sp1::T, 
-    sp2::T
-    )::Float64 where T
-
-    forward = Inf
-    reverse = Inf
-
-    try
-
-        forward = pathbetween(web, sp1, sp2)
-        forward = reduce(*, last.(forward))
-    catch
-
-        forward = Inf
-    end
-
-    try
-
-        reverse = pathbetween(web, sp2, sp1)
-        reverse = reduce(*, last.(reverse))
-    catch
-
-        reverse = Inf
-    end
-
-    return min(forward, reverse)
-end
-
 function cascade_density(
     qweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
     tweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
     pweb::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}},
-    summary_func::Function,
     cascade::Vector{Tuple{Float64, Vector{T}}}, 
     u::Vector{Float64}
-    )::Float64 where T
+    )::Tuple{Float64, Float64, Float64} where T
 
     if isempty(cascade)
 
-        return 0
+        return (0.0, 0.0, 0.0)
     end
 
     spp = last.(cascade)
@@ -61,75 +31,19 @@ function cascade_density(
     densities = [target_density(qweb, tweb, pweb, sp, u) for sp in spp]
     densities = densities ./ sum(u)
 
-    return summary_func(densities)
-end
+    null_samples = Vector{Float64}(undef, 10_000) 
+    Threads.@threads for i in (collect ∘ eachindex)(null_samples)
 
-function total_flux(
-    qweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
-    tweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
-    pweb::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}},
-)::Float64 where T
-
-    intxs = SpeciesInteractionNetworks.interactions(qweb)
-
-    return sum(abs.(last.(intxs)))
-end
-
-function target_flux(
-    qweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
-    tweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
-    pweb::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}},
-    targets::Vector{T}
-    )::Float64 where T
-
-    intxs = Set{eltype(SpeciesInteractionNetworks.interactions(qweb))}()
-
-    for target in targets
-
-        zs = filter(x-> target ∈ x,
-            SpeciesInteractionNetworks.interactions(qweb)
-        )
-
-        [push!(intxs, z) for z in zs]
+        nz_spp = findall(!iszero, u)
+        idxs = rand(nz_spp, length(spp))
+        null_densities = u[idxs]
+        null_densities = null_densities / sum(u)
+        null_samples[i] = median(null_densities)
     end
 
-    intxs = collect(intxs)
+    standard_error = std(null_samples; corrected = false)
 
-    return sum(abs.(last.(intxs)))
-end
-
-function nearby_flux(
-    qweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}}, 
-    tweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}}, 
-    pweb::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}},
-    targets::Vector{T}, 
-    radius = 2
-    ) where T
-
-    nhbs = neighbors.(Ref(pweb), targets, Ref(radius))
-    nhbs = (collect ∘ union)(nhbs...)
-
-    dst = zeros(Float64, length(nhbs))
-
-    # Distance from each neighbhour to the nearest target.
-    for (i, n) in enumerate(nhbs)
-        
-        dst[i] = minimum(distance_weight.(Ref(pweb), targets, Ref(n)))
-    end
-
-    for i in eachindex(dst)
-
-        if isinf(dst[i])
-            dst[i] = 0
-        end 
-    end
-
-    vals = [
-            target_flux(qweb, tweb, pweb, [sp]) 
-            for sp in nhbs
-        ]
-
-    return sum(abs.(vals .* dst))
+    return  (median(densities), median(null_samples), standard_error)
 end
 
 function target_density(
@@ -144,78 +58,18 @@ function target_density(
     return sum([u[i] for i in indx])
 end
 
-function nearby_density(
-    qweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}}, 
-    tweb::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}}, 
-    pweb::SpeciesInteractionNetwork{Unipartite{T}, Probabilistic{Float64}},
-    targets::Vector{T}, 
-    u::Vector{Float64}, 
-    radius = 2
-    )::Float64 where T
+# df1 = csv.read("sim-output/long-1-extinction-2026-07-30.csv", dataframe)
+# jld1 = jldopen("sim-output/long-1-extinction-2026-07-30.jld2")
+df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
+jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
 
-    nhbs = Vector{Set{T}}(undef, length(targets))
-    for (i, t) in enumerate(targets)
+preprocessing!(df4, jld4)
 
-        nhbs[i] = neighbors(tweb, t, radius)
-    end
-    nhbs = (collect ∘ union)(nhbs...)
-
-    dst = zeros(Float64, length(nhbs))
-
-    # Distance from each neighbhour to the nearest target.
-    for (i, n) in enumerate(nhbs)
-        
-        dst[i] = minimum(distance_weight.(Ref(pweb), targets, Ref(n)))
-    end
-
-    for i in eachindex(dst)
-
-        if isinf(dst[i])
-            dst[i] = 0
-        end 
-    end
-
-    densities = zeros(Float64, length(nhbs))
-
-    for i in eachindex(densities)
-
-        densities[i] = target_density(qweb, tweb, pweb, [nhbs[i]], u)
-
-    end
-
-    return sum(dst .* densities)
-end
-
-function SpeciesInteractionNetworks.neighbors(web, target, r)
-
-    if r == 1
-
-        return neighbors(web, target)
-    end
-
-    n = neighbors(web, target)
-
-    if isempty(n)
-        return Set{Symbol}()
-    end
-
-    return union(neighbors.(Ref(web), n, Ref(r-1))...)
-end
-
-#
-#
-#
-
-df1 = CSV.read("sim-output/1-extinctions-2026-07-07/data.csv", DataFrame)
-df4 = CSV.read("sim-output/4-extinctions-2026-07-07/data.csv", DataFrame)
-
-df = vcat(df1, df4)
-
-preprocessing!(df)
+# df = vcat(df1, df4)
+df = copy(df4)
 
 filter!(:realized_web => !ismissing, df)
 filter!(:density_pre => !ismissing, df)
-filter!(:richness_pre => x-> x > 20, df)
 
 transform!(df,
     [:realized_web, :realized_trim, :realized_prob, :target_species, :density_pre] =>
@@ -223,95 +77,82 @@ transform!(df,
     :target_density
 )
 
-# transform!(df,
-#     [:realized_web, :realized_trim, :realized_prob, :target_species, :density_pre] =>
-#     ByRow((qweb, tweb, pweb, t, d) -> nearby_density(qweb, tweb, pweb, t, d) / sum(d)) =>
-#     :nearby_density,
-#     threads = true
-# )
-
-# transform!(df,
-#     [:realized_web, :realized_trim, :realized_prob, :target_species] =>
-#     ByRow(
-#         (qweb, tweb, pweb, t) -> 
-#             target_flux(qweb, tweb, pweb, t) / total_flux(qweb, tweb, pweb)
-#     ) => :target_flux
-# )
-
-# transform!(df,
-#     [:realized_web, :realized_trim, :realized_prob, :target_species] =>
-#     ByRow(
-#         (qweb, tweb, pweb, t) -> 
-#             nearby_flux(qweb, tweb, pweb, t) / total_flux(qweb, tweb, pweb)
-#         ) =>
-#     :nearby_flux
-# )
-
-# transform!(df,
-#     [:target_flux, :target_density] =>
-#     ByRow((f, d) -> f/d) =>
-#     :target_turnover
-# )
-
 transform!(df,
     [:realized_web, :realized_trim, :realized_prob, :cascade, :density_pre] =>
     ByRow(
         (qweb, tweb, pweb, c, d) -> 
-            cascade_density(qweb, tweb, pweb, mean, c, d)
+            cascade_density(qweb, tweb, pweb, c, d)
         ) =>
-    :cascade_mean_density
+    [:cascade_density, :cascade_density_null, :cascade_density_se]
 )
 
 transform!(df,
-    [:realized_web, :realized_trim, :realized_prob, :cascade, :density_pre] =>
-    ByRow(
-        (qweb, tweb, pweb, c, d) -> 
-            cascade_density(qweb, tweb, pweb, median, c, d)
-        ) =>
-    :cascade_median_density
+    [:cascade_density, :cascade_density_null, :cascade_density_se] =>
+    ByRow((x, null, se) -> (x - null) / se)
+    => :cascade_density_standardized  
 )
 
-transform!(df,
-    [:realized_web, :realized_trim, :realized_prob, :cascade, :density_pre] =>
-    ByRow(
-        (qweb, tweb, pweb, c, d) -> 
-            cascade_density(qweb, tweb, pweb, x->quantile(x, 0.9), c, d)
-        ) =>
-    :cascade_q90_density
-)
-
-transform!(df,
-    [:realized_web, :realized_trim, :realized_prob, :cascade, :density_pre] =>
-    ByRow(
-        (qweb, tweb, pweb, c, d) -> 
-            cascade_density(qweb, tweb, pweb, maximum, c, d)
-        ) =>
-    :cascade_max_density
-)
-
-# --------------------------------------------------------- #
-# Are large cascades dominated by rare or abundant species. #
-# --------------------------------------------------------- #
+# ---------------------------------------------- #
+# Are larger cascades dominated by rare species? #
+# Yes                                            #
+# ---------------------------------------------- #
 
 filt = copy(df)
-filter!(:extinction_proportion => !iszero, filt)
+filter!(:cascade_number => x-> x == 1, filt)
+filter!(:secondary_extinctions => x-> x>0, filt)
 
-f  = Figure(size = (1200, 800))
+f  = Figure(size = (800, 800))
 ax = Axis(f[1,1], 
-    xlabel = "Proportion extinct", 
-    ylabel = "Median density of secondarily extinct species",
+    xlabel = "Cascade Size", 
+    ylabel = "Median Cascade Density (SE)",
+    xtickformat = "{:.2f}"
 )
 
 scatter!(ax, 
-    filt[:, :extinction_proportion],
-    filt[:, :cascade_median_density],
+    filt[:, :extinction_proportion], 
+    filt[:, :cascade_density_standardized],
 )
 
-# ----------------------------------------------------------- #
-# Is biomass more even in communities with adaptive foraging? #
-# ----------------------------------------------------------- # 
+#This probly needs to be a WLS regression.
+fit = lm(@formula(cascade_density_standardized ~ extinction_proportion), filt)
+ablines!(ax, coef(fit)[1], coef(fit)[2], color = :red, linewidth = 4)
 
-ax = Axis(f[1,2], 
+save("figures/cascaade_density_v_cascade_size.png", f)
+
+# -------------------------------------------------------------------------- #
+# Does the rarity of the species in a cascade change with adaptive foraging? #
+# Yes, they get a little less rare.                                          #
+# -------------------------------------------------------------------------- #
+
+filt = copy(df)
+filter!(:cascade_number => x-> x == 1, filt)
+filter!(:secondary_extinctions => x-> x>0, filt)
+
+f  = Figure(size = (800, 800))
+ax = Axis(f[1,1], 
+    xlabel = "Adaptation Rate", 
+    ylabel = "Median Cascade Density (SE)",
+    xtickformat = "{:.2f}"
+)
+
+boxplot!(ax, 
+    filt[:, :g], 
+    filt[:, :cascade_density_standardized],
+    width = 0.05
+)
+
+save("figures/cascade_density_v_g.png", f)
+
+# ---------------------------------------------------------------------- #
+# Are rare species less rare in communities that have adaptive foraging? #
+# Yes                                                                    #
+# ---------------------------------------------------------------------- # 
+
+filt = copy(df)
+filter!(:cascade_number => x-> x==1, filt)
+
+f  = Figure(size = (800, 800))
+ax = Axis(f[1,1], 
     xlabel = "Adaptation Rate", 
     ylabel = "10th Percentile of Species Density",
     xticks = unique(filt[:, :g]),
@@ -337,14 +178,15 @@ for n in unique(df[:, :n_targets])
     end
 
     gdf = groupby(biomasses, :g)
-    gdf = combine(gdf, :density => x -> quantile(x, 0.1))
+    gdf = combine(gdf, :density => (x -> quantile(x, 0.1)) => :density_function)
+    # gdf = combine(gdf, :density => shannon_eveness => :density_function)
 
     x = lines!(ax, gdf[:, :g], gdf[:, :density_function], linewidth = 3)
     push!(ls, x)
     push!(ns, n)
 end
 
-Legend(f[1,3], ls, string.(ns), "Primary Extinctions")
+Legend(f[1,2], ls, string.(ns), "Primary Extinctions")
 
 save("figures/biomass-eveness-g.png", f)
 
@@ -354,7 +196,7 @@ save("figures/biomass-eveness-g.png", f)
 # ------------------------------------------------------------------------ #
 
 filt = copy(df)
-filter!(:richness_pre => x-> x> 20, filt)
+filter!(:cascade_number => x-> x==5, filt)
 
 transform!(filt,
     [:density_pre] =>
@@ -377,6 +219,67 @@ fit = lm(@formula(foodweb_total_biomass ~ g), filt)
 ablines!(ax, coef(fit)[1], coef(fit)[2], color = :red, linewidth = 4)
 
 save("figures/biomass_v_g.png", f)
+
+# interesting thing is the trend revereses depending on whether I only use the
+# first cascade or all the cascades.
+
+# -------------------------------------------------------------------- #
+# Are communities with adaptive foraging more even than those without? #
+# Yes, a little bit.                                                   #
+# -------------------------------------------------------------------- #
+
+filt = copy(df)
+filter!(:cascade_number => x-> x==1, filt)
+
+transform!(filt,
+    [:density_pre] =>
+    ByRow(shannon_eveness) =>
+    :eveness
+)
+
+f  = Figure(size = (1000, 650))
+ax = Axis(f[1,1], 
+    xlabel = "Strength of Adaptive Foraging", 
+    ylabel = "Shannon Eveness",
+)
+boxplot!(ax, 
+    filt[:, :g],
+    filt[:, :eveness],
+    width = 0.05 
+)
+
+fit = lm(@formula(eveness ~ g), filt)
+ablines!(ax, coef(fit)[1], coef(fit)[2], color = :red, linewidth = 4)
+
+save("figures/eveness_v_g.png", f)
+
+# ----------------------------------------------------- #
+# Do more even communities experience smaller cascades? #
+# ----------------------------------------------------- #
+
+filt = copy(df)
+filter!(:cascade_number => x-> x==1, filt)
+
+transform!(filt,
+    [:density_pre] =>
+    ByRow(shannon_eveness) =>
+    :eveness
+)
+
+f  = Figure(size = (1000, 650))
+ax = Axis(f[1,1], 
+    xlabel = "Cascade Size", 
+    ylabel = "Shannon Eveness",
+)
+scatter!(ax, 
+    filt[:, :extinction_proportion],
+    filt[:, :eveness],
+)
+
+fit = lm(@formula(eveness ~ extinction_proportion), filt)
+ablines!(ax, coef(fit)[1], coef(fit)[2], color = :red, linewidth = 4)
+
+save("figures/eveness_v_cascade_size.png", f)
 
 # ----------------------------------------------------------------- #
 # Do the Rank-Abundance curves differ between large/small cascades? #
@@ -438,7 +341,6 @@ function extinction_ranks(df)
 
             acc[ranks[sp]] += 1
         end
-
     end
 
     return acc / sum(acc)
@@ -449,7 +351,7 @@ ax  = Axis(fig[1,1], xlabel = "Rank", ylabel = "Log Density")
 
 # Small cascades
 filt = copy(df)
-filter!(:richness_pre => x-> x >= 20, filt)
+filter!(:cascade_number => x-> x == 1, filt)
 filter!(:extinction_proportion => x-> x < 0.2, filt)
 
 curve = rank_abundance(filt)
@@ -486,7 +388,7 @@ ax  = Axis(fig[1,1], xlabel = "Rank", ylabel = "Log Density")
 
 # No g 
 filt = copy(df)
-filter!(:richness_pre => x-> x >= 20, filt)
+filter!(:cascade_number => x-> x == 1, filt)
 filter!(:g => x-> x == 0, filt)
 
 curve = rank_abundance(filt)
@@ -496,7 +398,7 @@ nog = lines!(ax, collect(1:30), curve.avg, color = ranks, linewidth = 10)
 
 # Large g
 filt = copy(df)
-filter!(:richness_pre => x-> x >= 20, filt)
+filter!(:cascade_number => x-> x == 1, filt)
 filter!(:g => x-> x > 0.2, filt)
 
 curve = rank_abundance(filt)
@@ -511,3 +413,31 @@ Legend(fig[1,2],
 )
 
 save("figures/rank-abundance-g.png", fig)
+
+#
+# Does the rank abundance curve change over time
+#
+
+fig = Figure(size = (800, 800))
+ax  = Axis(fig[1,1], xlabel = "Rank", ylabel = "Log Density")
+
+ncascade = [1,2,3,4]
+ls = [] 
+for n in ncascade
+
+    filt = copy(df)
+    filter!(:cascade_number => x-> x == n, filt)
+    filter!(:g => x-> x == 0, filt)
+
+    curve = rank_abundance(filt)
+    ranks = extinction_ranks(filt)
+    band!(ax, collect(1:30), curve.lower, curve.upper)
+    l = lines!(ax, collect(1:30), curve.avg, linewidth = 10)
+    push!(ls, l)
+end
+
+Legend(fig[1,2], 
+    ls, 
+    string.(ncascade), 
+    "Cascade Number"
+)

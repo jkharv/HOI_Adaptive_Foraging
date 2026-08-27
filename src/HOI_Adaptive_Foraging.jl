@@ -35,14 +35,18 @@ include("../src/measures.jl")
 export median_interaction_strength, leading_eigenvalue, richness
 export cascade_timespan, cascade_trophic_range
 export secondary_extinctions_during_trial, mean_extinction_time
-export maximum_trophic_level
+export maximum_trophic_level, shannon_diversity, shannon_eveness
+export niche_breadth, niche_overlap
 
 include("../src/simulation_tools.jl")
-export make_output_file!, save_parameters!, simulation_batch
+export make_output_file!, save_parameters!
 export extinction_indices, treatments
 
 include("../src/alpha_manifold.jl")
 export AlphaManifoldCallback
+
+include("../src/disturbance_callback.jl")
+export DisturbanceCallback
 
 include("../src/preprocessing.jl")
 export preprocessing!

@@ -7,6 +7,110 @@
 # See the corresponding file in ./scripts to find which measures are recorded in
 # which simulations.
 
+function shannon_diversity(u::AbstractVector{Float64})::Float64
+
+    total = sum(u) 
+
+    acc = 0.0
+    for x in u
+
+        if x <= 1e-10
+            continue
+        end
+        
+        acc += (x/total) * log(x/total)
+    end
+
+    return -acc
+end
+
+function shannon_eveness(u::AbstractVector{Float64})::Float64
+
+    h = shannon_diversity(u)
+    s = count(!iszero, u)
+
+    return h / log(s)
+end
+
+function niche_overlap(
+    web::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}}, 
+)::Float64 where T
+
+    acc = 0.0
+    nz_count = 0
+    for sp1 in species(web)
+        for sp2 in species(web)
+
+            # Does the potential niche of these two species overlap?
+            # Only count overlap if there's potential for overlap.
+            shared = intersect(successors(web, sp1), successors(web, sp2))
+            if length(shared) == 0 
+                continue
+            end
+            
+            nz_count += 1
+            acc += niche_overlap(web, sp1, sp2)         
+        end
+    end
+
+    return acc / nz_count
+end
+
+function niche_overlap(
+    web::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}}, 
+    sp1::T, sp2::T
+)::Float64 where T
+
+    resources = union(successors(web, sp1), successors(web, sp2))
+
+    # Numerator
+    acc_numerator = 0.0
+    for r in resources
+        acc_numerator += web[sp2, r] * web[sp1, r]
+    end
+
+    # Demoninator Sp1
+    acc_sp1 = 0.0 
+    for r in resources
+        acc_sp1 += web[sp1, r]^2.0
+    end
+
+    # Demoninator Sp2
+    acc_sp2 = 0.0 
+    for r in resources 
+        acc_sp2 += web[sp2, r]^2.0
+    end
+
+    res =  (2*acc_numerator) / (acc_sp1 + acc_sp2)
+
+    if isnan(res)
+        return 0.0
+    else
+        return res
+    end
+end
+
+function niche_breadth(
+    web::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
+    spp::T
+)::Float64 where T
+
+    max_std = std([1.0, 0.0]; corrected = false)
+
+    return std(web[spp, :]; corrected = false) / max_std
+end
+
+"""
+Return the niche partitioning for every species in the web.
+"""
+function niche_partitioning(
+    web::SpeciesInteractionNetwork{Unipartite{T}, Quantitative{Float64}},
+)::Dict{T, Float64} where T
+
+    alphas = map(x -> niche_partitioning(web, x), species(web))
+    return Dict(species(web) .=> alphas)
+end
+
 """
     cascade_trophic_range(web, extinctions::Vector{Symbol})
 

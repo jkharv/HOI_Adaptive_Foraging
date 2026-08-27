@@ -4,22 +4,21 @@ using .HOI_Adaptive_Foraging
 using WGLMakie
 using DataFrames
 using CSV
+using JLD2
 using GLM
 using Statistics
 using CategoricalArrays
 using QuantileRegressions
 using LsqFit
 
-df1 = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
-df2 = CSV.read("sim-output/two-extinctions-2026-04-30/data.csv", DataFrame)
-df3 = CSV.read("sim-output/three-extinctions-2026-04-30/data.csv", DataFrame)
-df4 = CSV.read("sim-output/four-extinctions-2026-04-30/data.csv", DataFrame)
+df1 = CSV.read("sim-output/long-1-extinction-2026-07-30.csv", DataFrame)
+jld1 = jldopen("sim-output/long-1-extinction-2026-07-30.jld2")
 
-df = vcat(df1, df2, df3, df4)
+df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
+jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
+preprocessing!(df4, jld4)
 
-filter!(:richness_pre => x-> x >= 20, df)
-
-preprocessing!(df)
+df = df4
 
 transform!(df,
     [:trophic_mean, :target_trophic_level] =>
@@ -35,6 +34,7 @@ transform!(df,
 
 filt = copy(df)
 filter!(:trophic_difference => !ismissing, filt)
+filter!(:cascade_number => x-> x == 1, filt)
 disallowmissing!(filt, :trophic_difference)
 
 f  = Figure(size = (800, 800))
@@ -60,6 +60,7 @@ save("figures/sup_trophic_difference_v_g.png", f)
 
 filt = copy(df)
 filter!(:trophic_difference => !ismissing, filt)
+filter!(:cascade_number => x->x==1, filt)
 disallowmissing!(filt, :trophic_difference)
 
 f  = Figure(size = (800, 800))

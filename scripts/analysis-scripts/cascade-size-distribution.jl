@@ -5,16 +5,19 @@ using WGLMakie
 using SpeciesInteractionNetworks
 using DataFrames
 using CSV
+using JLD2
 using GLM
 using Statistics
 using CategoricalArrays
 
-df1 = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
-df4 = CSV.read("sim-output/four-extinctions-2026-04-30/data.csv", DataFrame)
+df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
+jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
 
-df = vcat(df1, df4)
+preprocessing!(df4, jld4)
 
-preprocessing!(df)
+df = copy(df4)
+
+filter!(:cascade_number => x -> x == 1, df)
 
 const HIGH_RICHNESS = 1 # :lightblue
 const LOW_RICHNESS = 2  # :goldenrod
