@@ -159,6 +159,7 @@ function simulations(;
     removal_fraction = 0.5,
     number_of_runs = 10,
     n_disturbances = 1,
+    max_trials = 5,
     ntrajectories = 10,
     g1 = 0.0,
     g2 = 0.5,
@@ -207,8 +208,10 @@ function simulations(;
 
             @info "Running FoodwebModel $fwm_num, run number $run_num of $number_of_runs"
 
-            seq = (shuffle ∘ species)(fwm)
-            times = collect((1_000.0:time_between_disturbances:(length(seq) * 1_000.0)))
+            seq = (shuffle ∘ species)(fwm)[1:max_trials]
+            times = collect(
+                (1_000.0:time_between_disturbances:(length(seq) * time_between_disturbances))
+            )
 
             ps(x, y, z, w) = process_solution(x, y, z, w, 
                 fwm_num, 
@@ -249,6 +252,7 @@ simulations(
     number_of_foodwebs = 1,
     removal_fraction = 0.9,
     number_of_runs = 1,
+    max_trials = 5,
     n_disturbances = 1,
     stem = "disturbances",
 )

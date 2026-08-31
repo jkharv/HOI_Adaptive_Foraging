@@ -162,6 +162,7 @@ function simulations(;
     number_of_foodwebs  = 5,
     number_of_sequences = 10,
     n_extinctions = 1,
+    max_trials = 5,
     ntrajectories = 10,
     g1 = 0.0,
     g2 = 0.5,
@@ -209,8 +210,10 @@ function simulations(;
 
             @info "Running FoodwebModel $fwm_num, sequence number $seq_num of $number_of_sequences"
 
-            seq = (shuffle ∘ species)(fwm)
-            times = collect((1_000.0:time_between_extinctions:(length(seq) * 1_000.0)))
+            seq = (shuffle ∘ species)(fwm)[1:max_trials]
+            times = collect(
+                (1_000.0:time_between_extinctions:(length(seq) * time_between_extinctions))
+            )
 
             ps(x, y, z, w) = process_solution(x, y, z, w, 
                 fwm_num, 
@@ -250,6 +253,7 @@ simulations(
     minimum_basal_species = 1,
     number_of_foodwebs = 1,
     number_of_sequences = 1,
+    max_trials = 5,
     n_extinctions = 1,
     stem = "test",
 )
