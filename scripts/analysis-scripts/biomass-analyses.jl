@@ -58,18 +58,34 @@ function target_density(
     return sum([u[i] for i in indx])
 end
 
-# df1 = csv.read("sim-output/long-1-extinction-2026-07-30.csv", dataframe)
-# jld1 = jldopen("sim-output/long-1-extinction-2026-07-30.jld2")
+df1 = CSV.read("sim-output/1-extinction-2026-07-30.csv", DataFrame)
+jld1 = jldopen("sim-output/1-extinction-2026-07-30.jld2")
 df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
 jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
 
+df_disturbances = CSV.read("sim-output/disturbances-2026-09-02.csv", DataFrame)
+jld_disturbances = jldopen("sim-output/disturbances-2026-09-02.jld2")
+
+df_no_disturbances = CSV.read("sim-output/no-disturbances-2026-09-02.csv", DataFrame)
+jld_no_disturbances = jldopen("sim-output/no-disturbances-2026-09-02.jld2")
+
+preprocessing!(df1, jld1)
 preprocessing!(df4, jld4)
 
-# df = vcat(df1, df4)
-df = copy(df4)
+preprocessing!(df_disturbances, jld_disturbances)
+preprocessing!(df_no_disturbances, jld_no_disturbances)
+
+df_disturbances.removal_fraction .= 0.9
+df_no_disturbances.removal_fraction .= 0.0
+
+df = vcat(df1, df4)
+df_dist = vcat(df_disturbances, df_no_disturbances)
 
 filter!(:realized_web => !ismissing, df)
 filter!(:density_pre => !ismissing, df)
+
+filter!(:realized_web => !ismissing, df_dist)
+filter!(:density_pre => !ismissing, df_dist)
 
 transform!(df,
     [:realized_web, :realized_trim, :realized_prob, :target_species, :density_pre] =>
