@@ -16,12 +16,49 @@ using SpeciesInteractionNetworks
 using DataStructures
 using HigherOrderFoodwebs
 
-df1  = CSV.read("sim-output/1-extinction-2026-07-30.csv", DataFrame)
-jld1 = jldopen("sim-output/1-extinction-2026-07-30.jld2")
+df1  = CSV.read("sim-output/one-extinction-2026-09-15.csv", DataFrame)
+jld1 = jldopen("sim-output/one-extinction-2026-09-15.jld2")
+df1.dataset_num .= 1
+df2  = CSV.read("sim-output/one-extinction-2026-10-30.csv", DataFrame)
+jld2 = jldopen("sim-output/one-extinction-2026-10-30.jld2")
+df2.dataset_num .= 2
+
+df_disturbances = CSV.read("sim-output/disturbances-2026-09-02.csv", DataFrame)
+jld_disturbances = jldopen("sim-output/disturbances-2026-09-02.jld2")
+
+df_no_disturbances = CSV.read("sim-output/no-disturbances-2026-09-02.csv", DataFrame)
+jld_no_disturbances = jldopen("sim-output/no-disturbances-2026-09-02.jld2")
 
 preprocessing!(df1, jld1)
+preprocessing!(df2, jld2)
 
-df = copy(df1)
+preprocessing!(df_disturbances, jld_disturbances)
+preprocessing!(df_no_disturbances, jld_no_disturbances)
+
+df_ext = vcat(df1, df2)
+df_dist = vcat(df_disturbances, df_no_disturbances)
+
+df_disturbances.removal_fraction .= 0.9
+df_no_disturbances.removal_fraction .= 0.0
+df_ext.removal_fraction .= 1.0
+
+filter!(:realized_web => !ismissing, df_ext)
+filter!(:density_pre => !ismissing, df_ext)
+
+filter!(:realized_web => !ismissing, df_dist)
+filter!(:density_pre => !ismissing, df_dist)
+
+select!(df_ext, 
+    [:alpha_web, :cascade, :density_pre, 
+     :realized_prob, :g, :extinction_proportion,
+     :cascade_number, :removal_fraction]
+)
+
+select!(df_dist, [:alpha_web, :cascade, :density_pre, 
+     :realized_prob, :g, :extinction_proportion,
+     :cascade_number, :removal_fraction])
+
+df = vcat(df_ext, df_dist)
 
 transform!(df, [:alpha_web, :cascade] => ByRow(
     (x, y) -> begin
@@ -58,6 +95,11 @@ transform!(df, [:realized_prob] =>
     => :connectance
 )
 
+transform!(df, [:alpha_web] =>
+    ByRow((median ∘ values ∘ specificity))
+    => :median_specificity
+)
+
 # --------------------------------------------------------------------------- #
 # Do communities with adaptive foraging have less niche overlap?              #
 # Yes                                                                         #
@@ -67,10 +109,9 @@ transform!(df, [:realized_prob] =>
 # --------------------------------------------------------------------------- #
 
 filt = copy(df)
-filter!(:cascade_number => x -> x < 4, filt)
-filter!(:extinction_proportion => x -> x > 0, filt)
+filter!(:cascade_number => x -> x < 5, filt)
 
-fig = Figure(size = (1200, 800))
+fig = Figure(size = (1200, 600))
 ax  = Axis(fig[1,1], 
     xlabel = "Adaptation Rate", 
     ylabel = "Community Niche Overlap"
@@ -80,11 +121,8 @@ boxplot!(ax,
     filt[:, :g],
     filt[:, :community_niche_overlap];
     width = 0.05,
-    dodge = filt[:, :cascade_number],
-    color = filt[:, :cascade_number]
 )
 
-filt.foodweb_number = categorical(filt.foodweb_number)
 lmfit = lm(@formula(community_niche_overlap ~ g ), filt)
 ablines!(ax, coef(lmfit)[1], coef(lmfit)[2], linewidth = 4, color = :red)
 
@@ -99,7 +137,6 @@ scatter!(ax2,
     filt[:, :community_niche_overlap]
 )
 
-filt.foodweb_number = categorical(filt.foodweb_number)
 lmfit = lm(@formula(community_niche_overlap ~ extinction_proportion), filt)
 ablines!(ax2, coef(lmfit)[1], coef(lmfit)[2], linewidth = 4, color = :red)
 
@@ -114,7 +151,7 @@ filt = copy(df)
 filter!(:cascade_number => x -> x == 1, filt)
 filt.cascade_occured = map(x -> x > 0 ? true : false, filt.extinction_proportion)
 
-fig = Figure(size = (800,800))
+fig = Figure(size = (600,600))
 ax  = Axis(fig[1,1],
     xlabel = "Community Niche Overlap",
     ylabel = "Cascade Probability"
@@ -130,26 +167,16 @@ lines!(ax, xs, ys)
 
 save("figures/niche_overlap_logit.png", fig)
 
-# ------------------------------------------------------- #
-# Do adaptive communities have greater niche partitioning #
-# ------------------------------------------------------- #
+# ------------------------------------------------------------ #
+# Does niche partioning correspond to lower median specificity #
+# ------------------------------------------------------------ #
 
 filt = copy(df)
-filter!(:cascade_number => x -> x < 5, filt)
-filter!(:cascade_niche_breadth => (x -> x < 1.0), filt)
-filter!(:community_niche_breadth => (x -> x < 1.0), filt)
+filter!(:cascade_number => x -> x == 1, filt)
 
-fig = Figure(size = (1200, 800))
-ax  = Axis(fig[1,1], 
-    xlabel = "Adaptation Rate", 
-    ylabel = "Community Averaged Niche Breadth"
-)
-boxplot!(ax, 
-    filt[:, :g],
-    filt[:, :community_niche_breath],
-    dodge = filt[:, :cascade_number],
-    color = filt[:, :cascade_number],
-    width = 0.05
-)
+fig = Figure(size = (600,600))
+ax  = Axis(fig[1,1], xlabel = "Niche Overlap", ylabel = "Median Specificity")
 
-save("figures/niche_breadth.png", fig)
+scatter!(ax, filt[:, :community_niche_overlap], filt[:, :median_specificity])
+
+save("figures/median-specificity-v-niche-overlap.png", fig)

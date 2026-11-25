@@ -1,24 +1,26 @@
 include("../../src/HOI_Adaptive_Foraging.jl")
 using .HOI_Adaptive_Foraging
 
-using WGLMakie
+using CairoMakie
 using DataFrames
 using CSV
 using JLD2
 using GLM
 using Statistics
-using CategoricalArrays
-using QuantileRegressions
 using LsqFit
 
-df1 = CSV.read("sim-output/long-1-extinction-2026-07-30.csv", DataFrame)
-jld1 = jldopen("sim-output/long-1-extinction-2026-07-30.jld2")
+df1 = CSV.read("sim-output/one-extinction-2026-09-15.csv", DataFrame)
+jld1 = jldopen("sim-output/one-extinction-2026-09-15.jld2")
+df1.dataset_num .= 1
 
-df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
-jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
-preprocessing!(df4, jld4)
+df2 = CSV.read("sim-output/one-extinction-2026-10-30.csv", DataFrame)
+jld2 = jldopen("sim-output/one-extinction-2026-10-30.jld2")
+df2.dataset_num .= 2
 
-df = df4
+preprocessing!(df1, jld1)
+preprocessing!(df2, jld2)
+
+df = vcat(df1, df2)
 
 transform!(df,
     [:trophic_mean, :target_trophic_level] =>
@@ -51,7 +53,7 @@ boxplot!(ax,
     width = 0.05,
 )
 
-save("figures/sup_trophic_difference_v_g.png", f)
+save("figures/suplementary/trophic_difference_v_g.png", f)
 
 # --------------------------------------------------------- #
 # Are top-down and bottom-up effects implicated differently #
@@ -73,7 +75,6 @@ ax = Axis(f[1,1];
 scatter!(ax, 
     filt[:, :extinction_proportion], 
     filt[:, :trophic_difference];    
-    color = filt[:, :g]
 )
 
 # This isn't just using the standard GLM package cause this looked like a case 
@@ -96,4 +97,4 @@ fitWLS = curve_fit(model,
 
 ablines!(ax, fitWLS.param[1], fitWLS.param[2], color=:red, linewidth = 3)
 
-save("figures/trophic_difference_v_cascade_size.png", f)
+save("figures/trophic_difference_v_cascade_size.svg", f)

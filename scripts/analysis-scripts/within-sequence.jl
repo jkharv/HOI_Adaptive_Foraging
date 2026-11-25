@@ -1,25 +1,28 @@
 include("../../src/HOI_Adaptive_Foraging.jl")
 using .HOI_Adaptive_Foraging
 
-using WGLMakie
+using CairoMakie
 using SpeciesInteractionNetworks
 using DataFrames
 using CSV
 using Statistics
 using CategoricalArrays
 using Printf
+using JLD2
 using GLM
 
-df1 = CSV.read("sim-output/one-extinction-2026-04-30/data.csv", DataFrame)
-df2 = CSV.read("sim-output/two-extinctions-2026-04-30/data.csv", DataFrame)
-df3 = CSV.read("sim-output/three-extinctions-2026-04-30/data.csv", DataFrame)
-df4 = CSV.read("sim-output/four-extinctions-2026-04-30/data.csv", DataFrame)
+df1  = CSV.read("sim-output/one-extinction-2026-09-15.csv", DataFrame)
+jld1 = jldopen("sim-output/one-extinction-2026-09-15.jld2")
+df1.dataset_num .= 1
+df2  = CSV.read("sim-output/one-extinction-2026-10-30.csv", DataFrame)
+jld2 = jldopen("sim-output/one-extinction-2026-10-30.jld2")
+df2.dataset_num .= 2
 
-df = vcat(df1, df2, df3, df4)
+preprocessing!(df1, jld1)
+preprocessing!(df2, jld2)
+df = vcat(df1, df2)
 
 filter!(:richness_pre => x -> x > 20, df)
-
-preprocessing!(df)
 
 # Move this to preprocessing?
 transform!(df,
@@ -27,11 +30,10 @@ transform!(df,
     ByRow(length) =>
     [:disturbance_size]
 )
-
 filt = filter(:disturbance_size => x -> x > 0, df)
 file = "./figures/between-web-variation.svg"
 
-gdf = groupby(filt, [:foodweb_number, :sequence_number, :disturbance_size])
+gdf = groupby(filt, [:dataset_num, :foodweb_number, :sequence_number, :disturbance_size])
 
 intercepts = []
 slopes = []
@@ -54,7 +56,7 @@ for g in gdf
     )
 end
 
-fig = Figure(size = (1400, 800))
+fig = Figure(size = (650, 650))
 
 ax = Axis(fig[1,1];
     xlabel = "Cascade Size ~ Adaptation Rate", 
@@ -70,7 +72,7 @@ kcrit = 0
 
 for (k, pval) in enumerate(models.pvals)
 
-    if pval > (k / length(models.pvals)) * 0.05
+    if pval > (k / length(models.pvals)) * 0.10
 
         kcrit = k - 1
         break
@@ -78,6 +80,10 @@ for (k, pval) in enumerate(models.pvals)
 end
 
 indxs = collect(1:kcrit)
+
+# What is the 95% conf interval on the effect size?
+alpha = 0.05
+quantile(models.slopes, [0 + alpha/2, 1 - alpha/2])
 
 hist!(ax, models.slopes[indxs], bins = 30, color = :orange)
 
@@ -96,7 +102,7 @@ p_negative = Printf.format(Printf.Format("%.2f"),
     (n_negative / length(models.slopes[indxs]) * 100)
 )
 
-text!(ax, 0.8, 0.8; space = :relative, fontsize = 20,
+text!(ax, 0.1, 0.8; space = :relative, fontsize = 20,
     text = p_positive * " % positive\n" * p_negative * " % negative"
 )
 

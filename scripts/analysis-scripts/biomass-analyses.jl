@@ -58,10 +58,10 @@ function target_density(
     return sum([u[i] for i in indx])
 end
 
-df1 = CSV.read("sim-output/1-extinction-2026-07-30.csv", DataFrame)
-jld1 = jldopen("sim-output/1-extinction-2026-07-30.jld2")
-df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
-jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
+df1 = CSV.read("sim-output/one-extinction-2026-09-09.csv", DataFrame)
+jld1 = jldopen("sim-output/one-extinction-2026-09-09.jld2")
+# df4 = CSV.read("sim-output/long-4-extinctions-2026-07-30.csv", DataFrame)
+# jld4 = jldopen("sim-output/long-4-extinctions-2026-07-30.jld2")
 
 df_disturbances = CSV.read("sim-output/disturbances-2026-09-02.csv", DataFrame)
 jld_disturbances = jldopen("sim-output/disturbances-2026-09-02.jld2")
@@ -367,25 +367,21 @@ ax  = Axis(fig[1,1], xlabel = "Rank", ylabel = "Log Density")
 
 # Small cascades
 filt = copy(df)
-filter!(:cascade_number => x-> x == 1, filt)
+filter!(:cascade_number => x-> x < 3, filt)
 filter!(:extinction_proportion => x-> x < 0.2, filt)
 
 curve = rank_abundance(filt)
-ranks = extinction_ranks(filt)
-band!(ax, collect(1:30), curve.lower, curve.upper)
-small = lines!(ax, collect(1:30), curve.avg, color = ranks, 
+small = lines!(ax, collect(1:30), curve.avg, 
     linewidth = 10, linestyle = :dash
 )
 
 # Large cascades
 filt = copy(df)
-filter!(:richness_pre => x-> x >= 20, filt)
+filter!(:cascade_number => x-> x < 3, filt)
 filter!(:extinction_proportion => x-> x >= 0.2, filt)
 
 curve = rank_abundance(filt)
-ranks = extinction_ranks(filt)
-band!(ax, collect(1:30), curve.lower, curve.upper)
-large = lines!(ax, collect(1:30), curve.avg, color = ranks, linewidth = 10)
+large = lines!(ax, collect(1:30), curve.avg, linewidth = 10)
 
 Legend(fig[1,2], 
     [small, large], 
