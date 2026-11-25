@@ -2,8 +2,9 @@ Manifest.toml
 
 scratch.jl
 
+.vscode/*
+
 figures/*
 sim-output/*
-
 # We wanna keep the above directories themselves, but not the contents.
 !.gitkeep
